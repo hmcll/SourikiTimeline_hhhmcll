@@ -1,3 +1,7 @@
+@hhhmcll Contribution:
+Improved reaction speed of the masking operation
+
+
 # 総力戦タイムラインメーカー
 
 [![Test](https://github.com/kidonaru/SourikiTimeline/actions/workflows/test.yml/badge.svg)](https://github.com/kidonaru/SourikiTimeline/actions/workflows/test.yml)
