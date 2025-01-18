@@ -213,12 +213,16 @@ def download_video_gr(*args, project_path=None):
 
 @debug_args
 def _mask_preview_gr(config: ProjectConfig, project_path):
+    timer = DebugTimer()
+    timer.start()
     input_file_name = config.get_fixed_download_file_name()
     input_path = os.path.join(project_path, input_file_name)
     preview_time = config.movie_preview_time
 
-    preview_image, skill_name, time_text, cost = create_test_image(config, project_path, preview_time)
+    timer.print("Prev create_test_image")
+    preview_image, skill_name, fill_percentage, time_text, cost = create_test_image(config, project_path, preview_time)
 
+    timer.print("After create_test_image")
     preview_slider = gr.update(minimum=config.movie_start_time, maximum=config.movie_end_time)
 
     if skill_name != "" and time_text != "" and cost > 0:
@@ -228,12 +232,14 @@ def _mask_preview_gr(config: ProjectConfig, project_path):
         output_log = "情報の取得に失敗しました。\n\n"
         output_log += '設定値を調整してください。\n\n'
 
+    output_log += f"- スキル判定色の割合: {fill_percentage:.0f}%"
     output_log += f"- スキル: {skill_name}\n"
     output_log += f"- 残り時間: {time_text}\n"
     output_log += f"- コスト: {cost}\n\n"
 
+    timer.print("Prev Save")
     auto_save(config, project_path)
-
+    timer.print("After Save")
     return [output_log, input_path, preview_image, preview_slider]
 
 @debug_args
@@ -334,6 +340,29 @@ def create_test_image(config: ProjectConfig, project_path, target_time=0):
     
     timer.print("load_image")
 
+    output_image = create_test_image_imageBuffer.copy()
+
+    draw_image_rect(output_image, skill_mask_rect, '#ff0000')
+    draw_image_rect(output_image, cost_mask_rect, '#0000ff')
+    draw_image_rect(output_image, time_mask_rect, '#00ff00')
+
+    timer.print("drawn rects")
+
+    cost = get_image_bar_percentage(
+                create_test_image_imageBuffer,
+                cost_mask_rect,
+                cost_color1,
+                cost_color2,
+                cost_color_threshold) / 10
+
+    # costの位置に線を引く
+    x, y, w, h = cost_mask_rect
+    x += int(w * cost / 10)
+    draw_image_line(output_image, (x, y), (x, y+h), '#ffffff')
+
+    timer.print("got cost")
+    
+    
     chara_skills = CharaSkill.from_tsv()
     chara_skills = [cs for cs in chara_skills if cs.chara_name not in ignore_chara_names]
     timer.print("CharaSkill.from_tsv")
@@ -345,55 +374,17 @@ def create_test_image(config: ProjectConfig, project_path, target_time=0):
     skill_texts = ocr_image(create_test_image_imageBuffer, skill_mask_rect)
     skill_text = "".join(skill_texts)
 
+    timer.print("ocr_skill")
     time_texts = ocr_image(create_test_image_imageBuffer, time_mask_rect, 'en')
     time_text = format_time_string("".join(time_texts))
-    timer.print("ocr_image")
+    timer.print("ocr_time")
 
     chara_skill, similarity = CharaSkill.find_best_match(chara_skills, skill_text)
-    timer.print("CharaSkill.find_best_match")
-
-    cost = get_image_bar_percentage(
-                create_test_image_imageBuffer,
-                cost_mask_rect,
-                cost_color1,
-                cost_color2,
-                cost_color_threshold) / 10
-
-    timer.print("got cost")
-    output_image = create_test_image_imageBuffer.copy()
-
-    draw_image_rect(output_image, skill_mask_rect, '#ff0000')
-    draw_image_rect(output_image, cost_mask_rect, '#0000ff')
-    draw_image_rect(output_image, time_mask_rect, '#00ff00')
-
-    timer.print("drawn rects")
-    # costの位置に線を引く
-    x, y, w, h = cost_mask_rect
-    x += int(w * cost / 10)
-    draw_image_line(output_image, (x, y), (x, y+h), '#ffffff')
-
-    timer.print("drawn lines")
-
-    skill_info = f"{skill_text}: {chara_skill.chara_name} ({similarity:.2f}%)" if chara_skill is not None else "None"
-    skill_info += f"\nスキル判定色の割合: {fill_percentage:.0f}%"
-
-    def rect_to_position(rect, offset):
-        x, y, w, h = rect
-        ox, oy = offset
-        return x + ox, y + oy
-
-    image_scale = output_image.shape[1] / 1920
-    font_size = 40 * image_scale
-    stroke_width = 3 * image_scale
-    output_image = draw_image_string(output_image, skill_info, rect_to_position(skill_mask_rect, (0, 50 * image_scale)), '#ff0000', font_size, stroke_width)
-    output_image = draw_image_string(output_image, f"コスト: {cost}", rect_to_position(cost_mask_rect, (0, -50 * image_scale)), '#0000ff', font_size, stroke_width)
-    output_image = draw_image_string(output_image, time_text, rect_to_position(time_mask_rect, (0, 50 * image_scale)), '#00ff00', font_size, stroke_width)
-
-    timer.print("drawn strings")
     skill_name = chara_skill.skill_name if chara_skill is not None else ""
 
+
     timer.print("image generation Finished")
-    return [output_image, skill_name, time_text, cost]
+    return [output_image, skill_name, fill_percentage, time_text, cost]
 
 @debug_args
 def _timeline_generate_gr(config: ProjectConfig, project_path: str):

@@ -91,7 +91,7 @@ with gr.Blocks(title="総力戦タイムラインメーカー", js=js) as demo:
 
         with gr.TabItem("マスク調整"):
             with gr.Row():
-                with gr.Column():
+                with gr.Column(scale=2):
                     add_space(1)
                     with gr.Row():
                         mask_preview_button = gr.Button("プレビュー更新", variant="primary")
@@ -151,8 +151,8 @@ with gr.Blocks(title="総力戦タイムラインメーカー", js=js) as demo:
                             mask_image_w_slider = gr.Number(value=config.mask_image_w, label="Width", visible=False)
                             mask_image_h_slider = gr.Number(value=config.mask_image_h, label="Height", visible=False)
 
-                with gr.Column():
-                    movie_preview_image = gr.Image(label="Preview Image", interactive=False)
+                with gr.Column(scale=5):
+                    movie_preview_image = gr.Image(label="Preview Image", interactive=False,every=1,elem_id = "Preview_Image")
                     movie_input_video = gr.Video(label="Download Video")
 
         with gr.TabItem("タイムライン生成"):
@@ -294,6 +294,7 @@ with gr.Blocks(title="総力戦タイムラインメーカー", js=js) as demo:
 
         timeline_ignore_chara_names_dropdown,
         timeline_max_time_number,
+
     ]
 
     outputs = [
@@ -408,7 +409,7 @@ with gr.Blocks(title="総力戦タイムラインメーカー", js=js) as demo:
     movie_download_button.click(download_video_gr,
                           inputs=[
                                 *app_config_inputs,
-                                *inputs,
+                                *inputs
                           ],
                           outputs=[
                                 base_output,
@@ -425,6 +426,7 @@ with gr.Blocks(title="総力戦タイムラインメーカー", js=js) as demo:
                           inputs=[
                                 *app_config_inputs,
                                 *inputs,
+                                
                           ],
                           outputs=[
                                 base_output,
