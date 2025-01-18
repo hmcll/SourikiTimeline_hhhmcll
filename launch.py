@@ -210,7 +210,7 @@ with gr.Blocks(title="総力戦タイムラインメーカー", js=js) as demo:
     with Modal(visible=False) as load_mask_modal:
         with gr.Row():
             with gr.Column(scale=1.5):
-                mask_image_name_dropdown = gr.Dropdown(get_mask_image_names(), value=config.mask_image_name, label="マスク画像名", info="OCRで読み取るマスク範囲を選択します。resources\maskに格納されている画像を使用できます")
+                mask_image_name_dropdown = gr.Dropdown(get_mask_image_names(), value=config.mask_image_name, label="マスク画像名", info="OCRで読み取るマスク範囲を選択します。resources\\maskに格納されている画像を使用できます")
                 load_mask_button = gr.Button("ロード", variant="primary")
             with gr.Column(scale=1):
                 load_mask_output = gr.Markdown(show_label=False)
@@ -220,7 +220,7 @@ with gr.Blocks(title="総力戦タイムラインメーカー", js=js) as demo:
     with Modal(visible=False) as save_mask_modal:
         with gr.Row():
             with gr.Column(scale=1.5):
-                save_mask_image_name_text = gr.Textbox(label="マスク画像名", info="保存するファイル名を入力してください。resources\maskに保存されます")
+                save_mask_image_name_text = gr.Textbox(label="マスク画像名", info="保存するファイル名を入力してください。resources\\maskに保存されます")
                 save_mask_button = gr.Button("保存", variant="primary")
             with gr.Column(scale=1):
                 save_mask_output = gr.Markdown(show_label=False)
