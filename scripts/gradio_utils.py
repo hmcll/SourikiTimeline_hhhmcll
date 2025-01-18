@@ -337,7 +337,6 @@ def create_test_image(config: ProjectConfig, project_path, target_time=0):
         create_test_image_imageBufferTimestamp = target_time
 
 
-    
     timer.print("load_image")
 
     output_image = create_test_image_imageBuffer.copy()
@@ -355,7 +354,7 @@ def create_test_image(config: ProjectConfig, project_path, target_time=0):
                 cost_color2,
                 cost_color_threshold) / 10
 
-    # costの位置に線を引く
+    # costの位置に線を引くcost_color_threshold
     x, y, w, h = cost_mask_rect
     x += int(w * cost / 10)
     draw_image_line(output_image, (x, y), (x, y+h), '#ffffff')
@@ -415,67 +414,22 @@ def _timeline_generate_gr(config: ProjectConfig, project_path: str):
 
     rows = []
     columns = get_timeline_columns()
-
-    class FrameData:
-        chara_skill: CharaSkill = None
-        time_image: np.ndarray = None
-        movie_time: int = 0
-        cost: float = 0
-
-        remain_time: int = 0
-
-        def __init__(self, chara_skill, time_image, movie_time, cost):
-            self.chara_skill = chara_skill
-            self.time_image = time_image
-            self.movie_time = movie_time
-            self.cost = cost
-
-        def calculate(self):
-            if self.time_image is None:
-                return
-
-            time_texts = ocr_image(self.time_image, None, 'en')
-            remain_time_text = format_time_string("".join(time_texts))
-            self.remain_time = str_to_time(remain_time_text)
-
-            if self.remain_time == 0:
-                self.cost = 0
-
-            self.time_image = None
-
-    prev_frame_chara_skill = None
-    last_max_cost = 0
-    is_executing_skill = False
-    frame_datas: list[FrameData] = []
-    used_skill_frame_ids = []
-
+    
     with VideoFileClip(input_path) as clip:
         end_time = clip.duration if end_time == 0 else end_time
         end_time_text = time_to_str(end_time)
         with clip.subclipped(start_time, end_time).with_fps(frame_rate) as subclip:
+            frame_Markers = []
+            frame_count = int(frame_rate * subclip.duration)
+            last_cost = 0.0
             for frame_id, frame in enumerate(subclip.iter_frames()):
+                
                 movie_time = start_time + (frame_id / frame_rate)
                 movie_time_text = time_to_str(movie_time)
                 print(f"progress movie... {movie_time_text} / {end_time_text}")
 
                 input_image = crop_image(frame, (movie_x, movie_y, movie_width, movie_height))
-
-                fill_percentage = max(get_color_fill_percentage(input_image, skill_mask_rect, skill_color1, skill_color_threshold),
-                                          get_color_fill_percentage(input_image, skill_mask_rect, skill_color2, skill_color_threshold))
-
-                chara_skill = None
-
-                if fill_percentage >= skill_color_fill_percentage:
-                    if not is_executing_skill:
-                        skill_texts = ocr_image(input_image, skill_mask_rect)
-                        skill_text = "".join(skill_texts)
-
-                        chara_skill, similarity = CharaSkill.find_best_match(chara_skills, skill_text)
-                else:
-                    is_executing_skill = False
-
-                time_image = crop_image(input_image, time_mask_rect)
-
+                
                 cost = get_image_bar_percentage(
                         input_image,
                         cost_mask_rect,
@@ -483,54 +437,69 @@ def _timeline_generate_gr(config: ProjectConfig, project_path: str):
                         cost_color2,
                         cost_color_threshold) / 10
                 
-                frame_data = FrameData(
-                    chara_skill,
-                    time_image,
-                    movie_time,
-                    cost
-                )
+                if last_cost - cost > .5:
+                    time_image = crop_image(input_image, time_mask_rect)
 
-                frame_datas.append(frame_data)
+                    time_texts = ocr_image(time_image, None, 'en')
+                    remain_time_text = format_time_string("".join(time_texts))
+                    if remain_time_text != "":
+                        
+                        remain_time = str_to_time(remain_time_text)
 
-                if chara_skill is not None and chara_skill == prev_frame_chara_skill:
-                    used_skill_frame_ids.append(frame_id)
+                        frame_Markers.append([frame_id, last_cost,remain_time])
+                        last_cost = cost
+                        
+                else:
+                    if cost - last_cost > .3:
+                        
+                        time_image = crop_image(input_image, time_mask_rect)
 
-                    is_executing_skill = True
+                        time_texts = ocr_image(time_image, None, 'en')
+                        remain_time_text = format_time_string("".join(time_texts))
+                        if remain_time_text == "":
+                            continue
+                    last_cost = cost
+            
+            for marker_ID,[frame_ID,cost,remain_time] in enumerate(frame_Markers):
+                
+                if marker_ID + 1 < len(frame_Markers):
+                    maxFrame = int(frame_Markers[marker_ID + 1][0] - frame_ID)
+                else:
+                    maxFrame = int(min(120,frame_count - frame_ID))
 
-                prev_frame_chara_skill = chara_skill
-
-    for skill_index, frame_id in enumerate(used_skill_frame_ids):
-        frame_data = frame_datas[frame_id]
-        frame_data.calculate()
-
-        movie_time_text = time_to_str(frame_data.movie_time)
-        print(f"progress frame... {movie_time_text} / {end_time_text}")
-
-        prev_skill_frame_id = max(frame_id - 10, 0)
-        if skill_index > 0:
-            prev_skill_frame_id = max(used_skill_frame_ids[skill_index - 1], prev_skill_frame_id)
-
-        last_max_cost = 0
-        last_min_cost = 10
-        for i in range(prev_skill_frame_id, frame_id):
-            frame_datas[i].calculate()
-            cost = frame_datas[i].cost
-            if cost > 0:
-                last_max_cost = max(cost, last_max_cost)
-                last_min_cost = min(cost, last_min_cost)
-
-        row = []
-        row.append(f"{last_max_cost:.1f}") # 発動時コスト
-        row.append(f"{last_min_cost:.1f}") # 残コスト
-        row.append(frame_data.chara_skill.chara_name) # キャラ名
-        row.append(frame_data.chara_skill.get_short_chara_name()) # 短縮キャラ名
-        row.append(frame_data.chara_skill.skill_name) # スキル名
-        row.append(time_to_str(max_time - frame_data.remain_time)) # 残り時間
-        row.append(time_to_str(frame_data.remain_time)) # 経過時間
-        row.append(time_to_str(frame_data.movie_time)) # 動画再生位置
-
-        rows.append(row)
-
+                skill_text = ""
+                for i in range(20,maxFrame):
+                    
+                    thisFrame = subclip.get_frame((frame_ID + i)/frame_rate)
+                    fill_percentage = max(get_color_fill_percentage(thisFrame, skill_mask_rect, skill_color1, skill_color_threshold),
+                                            get_color_fill_percentage(thisFrame, skill_mask_rect, skill_color2, skill_color_threshold))
+                    
+                    if fill_percentage >= skill_color_fill_percentage:
+                    
+                        skill_texts = ocr_image(thisFrame, skill_mask_rect)
+                        skill_text = "".join(skill_texts)
+                        chara_skill, match = CharaSkill.find_best_match(chara_skills, skill_text)
+                        if match > 70:
+                            break
+                        
+                row = []
+                row.append(f"{cost:.1f}") # 発動時コスト
+                row.append(f"{cost:.1f}") # 残コスト
+                if skill_text != "":
+                    row.append(chara_skill.chara_name) # キャラ名
+                    row.append(chara_skill.get_short_chara_name()) # 短縮キャラ名
+                    row.append(chara_skill.skill_name) # スキル名
+                else:
+                    row.append("") # キャラ名
+                    row.append("") # 短縮キャラ名
+                    row.append("") # スキル名
+                row.append(time_to_str(max_time - remain_time)) # 残り時間
+                row.append(time_to_str(remain_time)) # 経過時間
+                row.append(time_to_str(remain_time)) # 動画再生位置
+                
+                rows.append(row)
+                        
+                        
     source_dataframe = pd.DataFrame(data=rows, columns=columns, dtype=str)
     save_timeline(project_path, source_dataframe)
 
