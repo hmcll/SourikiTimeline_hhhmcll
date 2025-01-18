@@ -414,7 +414,8 @@ def _timeline_generate_gr(config: ProjectConfig, project_path: str):
 
     rows = []
     columns = get_timeline_columns()
-    
+    timer = DebugTimer()
+    timer.start()
     with VideoFileClip(input_path) as clip:
         end_time = clip.duration if end_time == 0 else end_time
         end_time_text = time_to_str(end_time)
@@ -422,12 +423,15 @@ def _timeline_generate_gr(config: ProjectConfig, project_path: str):
             frame_Markers = []
             frame_count = int(frame_rate * subclip.duration)
             last_cost = 0.0
-            for frame_id, frame in enumerate(subclip.iter_frames()):
+            frame_id = 0
+            while frame_id < frame_count:
                 
                 movie_time = start_time + (frame_id / frame_rate)
                 movie_time_text = time_to_str(movie_time)
+
                 print(f"progress movie... {movie_time_text} / {end_time_text}")
 
+                frame = subclip.get_frame(frame_id/frame_rate)
                 input_image = crop_image(frame, (movie_x, movie_y, movie_width, movie_height))
                 
                 cost = get_image_bar_percentage(
@@ -448,6 +452,7 @@ def _timeline_generate_gr(config: ProjectConfig, project_path: str):
 
                         frame_Markers.append([frame_id, last_cost,remain_time])
                         last_cost = cost
+                        frame_id += 15
                         
                 else:
                     if cost - last_cost > .3:
@@ -457,18 +462,21 @@ def _timeline_generate_gr(config: ProjectConfig, project_path: str):
                         time_texts = ocr_image(time_image, None, 'en')
                         remain_time_text = format_time_string("".join(time_texts))
                         if remain_time_text == "":
+                            last_cost = 0
+                            frame_id += 15
                             continue
                     last_cost = cost
+                frame_id += 1
             
             for marker_ID,[frame_ID,cost,remain_time] in enumerate(frame_Markers):
                 
                 if marker_ID + 1 < len(frame_Markers):
-                    maxFrame = int(frame_Markers[marker_ID + 1][0] - frame_ID)
+                    maxFrame = min(70, int(frame_Markers[marker_ID + 1][0] - frame_ID))
                 else:
-                    maxFrame = int(min(120,frame_count - frame_ID))
+                    maxFrame = int(min(70,frame_count - frame_ID))
 
                 skill_text = ""
-                for i in range(20,maxFrame):
+                for i in range(30,maxFrame,5):
                     
                     thisFrame = subclip.get_frame((frame_ID + i)/frame_rate)
                     fill_percentage = max(get_color_fill_percentage(thisFrame, skill_mask_rect, skill_color1, skill_color_threshold),
@@ -511,6 +519,7 @@ def _timeline_generate_gr(config: ProjectConfig, project_path: str):
     output_log = "タイムラインを生成しました。\n\n"
     output_log += "クリップボードにコピーしました。\n\n"
 
+    timer.print("end")
     return [output_log, dataframe, dataframe_tsv]
 
 @debug_args
