@@ -284,7 +284,31 @@ def load_preview_image(config: ProjectConfig, project_path, target_time):
     return image
 
 @debug_args
+def load_preview_image_timed(config: ProjectConfig, project_path, target_time, timer):
+    input_name = config.get_fixed_download_file_name()
+    input_path = os.path.join(project_path, input_name)
+    movie_x = config.movie_x
+    movie_y = config.movie_y
+    movie_width = config.movie_width
+    movie_height = config.movie_height
+    timer.print("Load Preview Init")
+    image = extract_video_frame(input_path, target_time)
+    timer.print("Frame Extracted")
+    image = crop_image(image, (movie_x, movie_y, movie_width, movie_height))
+    timer.print("Image Chopped")
+    return image
+
+
+global create_test_image_imageBuffer
+global create_test_image_imageBufferTimestamp
+
+create_test_image_imageBufferTimestamp = -1
+
+@debug_args
 def create_test_image(config: ProjectConfig, project_path, target_time=0):
+
+    global create_test_image_imageBuffer
+    global create_test_image_imageBufferTimestamp
     cost_color1 = config.mask_cost_color1
     cost_color2 = config.mask_cost_color2
     cost_color_threshold = config.mask_cost_color_threshold
@@ -298,22 +322,30 @@ def create_test_image(config: ProjectConfig, project_path, target_time=0):
 
     timer = DebugTimer()
     timer.start()
+    
+    if create_test_image_imageBufferTimestamp != target_time:
+        
+        print("Changing Time From" + str(create_test_image_imageBufferTimestamp) + " To " + str(target_time))
+        
+        create_test_image_imageBuffer = load_preview_image_timed(config, project_path, target_time,timer)
+        create_test_image_imageBufferTimestamp = target_time
 
-    input_image = load_preview_image(config, project_path, target_time)
+
+    
     timer.print("load_image")
 
     chara_skills = CharaSkill.from_tsv()
     chara_skills = [cs for cs in chara_skills if cs.chara_name not in ignore_chara_names]
     timer.print("CharaSkill.from_tsv")
 
-    fill_percentage = max(get_color_fill_percentage(input_image, skill_mask_rect, skill_color1, skill_color_threshold),
-                            get_color_fill_percentage(input_image, skill_mask_rect, skill_color2, skill_color_threshold))
+    fill_percentage = max(get_color_fill_percentage(create_test_image_imageBuffer, skill_mask_rect, skill_color1, skill_color_threshold),
+                            get_color_fill_percentage(create_test_image_imageBuffer, skill_mask_rect, skill_color2, skill_color_threshold))
     timer.print("get_color_fill_percentage")
 
-    skill_texts = ocr_image(input_image, skill_mask_rect)
+    skill_texts = ocr_image(create_test_image_imageBuffer, skill_mask_rect)
     skill_text = "".join(skill_texts)
 
-    time_texts = ocr_image(input_image, time_mask_rect, 'en')
+    time_texts = ocr_image(create_test_image_imageBuffer, time_mask_rect, 'en')
     time_text = format_time_string("".join(time_texts))
     timer.print("ocr_image")
 
@@ -321,22 +353,26 @@ def create_test_image(config: ProjectConfig, project_path, target_time=0):
     timer.print("CharaSkill.find_best_match")
 
     cost = get_image_bar_percentage(
-                input_image,
+                create_test_image_imageBuffer,
                 cost_mask_rect,
                 cost_color1,
                 cost_color2,
                 cost_color_threshold) / 10
 
-    output_image = input_image.copy()
+    timer.print("got cost")
+    output_image = create_test_image_imageBuffer.copy()
 
     draw_image_rect(output_image, skill_mask_rect, '#ff0000')
     draw_image_rect(output_image, cost_mask_rect, '#0000ff')
     draw_image_rect(output_image, time_mask_rect, '#00ff00')
 
+    timer.print("drawn rects")
     # costの位置に線を引く
     x, y, w, h = cost_mask_rect
     x += int(w * cost / 10)
     draw_image_line(output_image, (x, y), (x, y+h), '#ffffff')
+
+    timer.print("drawn lines")
 
     skill_info = f"{skill_text}: {chara_skill.chara_name} ({similarity:.2f}%)" if chara_skill is not None else "None"
     skill_info += f"\nスキル判定色の割合: {fill_percentage:.0f}%"
@@ -353,8 +389,10 @@ def create_test_image(config: ProjectConfig, project_path, target_time=0):
     output_image = draw_image_string(output_image, f"コスト: {cost}", rect_to_position(cost_mask_rect, (0, -50 * image_scale)), '#0000ff', font_size, stroke_width)
     output_image = draw_image_string(output_image, time_text, rect_to_position(time_mask_rect, (0, 50 * image_scale)), '#00ff00', font_size, stroke_width)
 
+    timer.print("drawn strings")
     skill_name = chara_skill.skill_name if chara_skill is not None else ""
 
+    timer.print("image generation Finished")
     return [output_image, skill_name, time_text, cost]
 
 @debug_args
