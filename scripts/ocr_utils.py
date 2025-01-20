@@ -120,6 +120,27 @@ def get_image_bar_percentage(image: np.ndarray, mask_rect, hex_color1, hex_color
     
     return int(max_x / w * 100)
 
+
+@debug_args
+def get_image_bar_percentage_hmcll(image: np.ndarray, mask_rect, hex_color1, hex_color2, threshold):
+    
+    x, y, w, h = mask_rect
+    choppedImage = image[y:y+h, x:x+w]
+    shrinkedImage = cv2.cvtColor(cv2.resize(choppedImage,(100,1)),cv2.COLOR_RGB2GRAY)[0]
+    sum = 0 
+    i = 0
+    for i in range(100):
+        sum += shrinkedImage[i]
+        if shrinkedImage[i] < sum/(i+1):
+            sum = sum/(i+1)
+            break
+    ret = i
+    for j in range(i,100):
+        if shrinkedImage[j] > sum:
+            ret = j
+    return ret
+
+
 # 特定の範囲内の色の割合を取得
 @debug_args
 def get_color_fill_percentage(image: np.ndarray, mask_rect, hex_color, threshold):

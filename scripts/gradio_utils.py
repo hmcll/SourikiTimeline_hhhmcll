@@ -9,13 +9,15 @@ import requests
 import ctypes
 from moviepy import VideoFileClip
 
+import cv2
+
 from scripts.chara_skill import CharaSkill
 from scripts.common_utils import convert_safe_filename, load_memo, load_timeline, save_image, save_memo, save_timeline, str_to_time, time_to_str
 from scripts.config_utils import AppConfig, ProjectConfig, get_timeline_columns
 from scripts.debug_timer import DebugTimer
 from scripts.debug_utils import debug_args
 from scripts.media_utils import download_video, extract_video_frame, get_video_info, resize_image
-from scripts.ocr_utils import crop_image, draw_image_line, draw_image_rect, draw_image_string, get_color_fill_percentage, get_image_bar_percentage, get_mask_image_rect, ocr_image
+from scripts.ocr_utils import crop_image, draw_image_line, draw_image_rect, draw_image_string, get_color_fill_percentage, get_image_bar_percentage,get_image_bar_percentage_hmcll, get_mask_image_rect, ocr_image
 from scripts.platform_utils import get_folder_path
 
 app_config = AppConfig.instance()
@@ -420,7 +422,9 @@ def _timeline_generate_gr(config: ProjectConfig, project_path: str):
         end_time = clip.duration if end_time == 0 else end_time
         end_time_text = time_to_str(end_time)
         with clip.subclipped(start_time, end_time).with_fps(frame_rate) as subclip:
+
             frame_Markers = []
+            Cost_Frame = []
             frame_count = int(frame_rate * subclip.duration)
             last_cost = 0.0
             frame_id = 0
@@ -429,43 +433,51 @@ def _timeline_generate_gr(config: ProjectConfig, project_path: str):
                 movie_time = start_time + (frame_id / frame_rate)
                 movie_time_text = time_to_str(movie_time)
 
-                print(f"progress movie... {movie_time_text} / {end_time_text}")
+#                print(f"progress movie... {movie_time_text} / {end_time_text}")
 
                 frame = subclip.get_frame(frame_id/frame_rate)
                 input_image = crop_image(frame, (movie_x, movie_y, movie_width, movie_height))
                 
-                cost = get_image_bar_percentage(
-                        input_image,
-                        cost_mask_rect,
-                        cost_color1,
-                        cost_color2,
-                        cost_color_threshold) / 10
                 
-                if last_cost - cost > .5:
-                    time_image = crop_image(input_image, time_mask_rect)
+#                time_image = crop_image(input_image, time_mask_rect)
+#                time_texts = ocr_image(time_image, None, 'en')
+#                remain_time_text = format_time_string("".join(time_texts))
+#                if remain_time_text == "":
+#                    frame_id += 15
+#                    continue
+#                percentTimer = DebugTimer()
+#                percentTimer.start()
+                
+                x, y, w, h = cost_mask_rect
+                choppedImage = input_image[y:y+h, x:x+w]
+                shrinkedImage = cv2.resize(choppedImage[:,:,2],(100,1))[0]
+                sum = 0 
+                i = 0
+                for i in range(100):
+                    sum += shrinkedImage[i]
+                    if shrinkedImage[i] < sum/(i+1):
+                        sum = sum/(i+1)
+                        break
+                ret = i
+                for j in range(i,100):
+                    if shrinkedImage[j] > sum:
+                        ret = j
+                cost = ret /10
 
+#                percentTimer.print("time2")
+
+#                if last_cost - cost > .5:
+                        
+#                    remain_time = str_to_time(remain_time_text)
+#                    frame_Markers.append([frame_id, last_cost,remain_time])
+#                    frame_id += 10
+                if cost != last_cost:
+                    time_image = crop_image(input_image, time_mask_rect)
                     time_texts = ocr_image(time_image, None, 'en')
                     remain_time_text = format_time_string("".join(time_texts))
-                    if remain_time_text != "":
-                        
-                        remain_time = str_to_time(remain_time_text)
-
-                        frame_Markers.append([frame_id, last_cost,remain_time])
-                        last_cost = cost
-                        frame_id += 15
-                        
-                else:
-                    if cost - last_cost > .3:
-                        
-                        time_image = crop_image(input_image, time_mask_rect)
-
-                        time_texts = ocr_image(time_image, None, 'en')
-                        remain_time_text = format_time_string("".join(time_texts))
-                        if remain_time_text == "":
-                            last_cost = 0
-                            frame_id += 15
-                            continue
+                    Cost_Frame.append([last_cost,remain_time_text])
                     last_cost = cost
+                    
                 frame_id += 1
             
             for marker_ID,[frame_ID,cost,remain_time] in enumerate(frame_Markers):
