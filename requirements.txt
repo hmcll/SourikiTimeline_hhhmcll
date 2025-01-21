@@ -1,12 +1,10 @@
-gradio<5.0.0
-gradio_modal
-moviepy
 paddleocr==2.9.1
 paddlepaddle
 parameterized
-pillow
 pydantic
 pyperclip
-pytubefix
 yt-dlp
 setuptools
+imgui-bundle
+opencv-python
+pyGLM
