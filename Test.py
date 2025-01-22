@@ -8,6 +8,7 @@ from scripts.ocr_utils import crop_image, draw_image_line, draw_image_rect, draw
 from scripts.common_utils import convert_safe_filename, load_memo, load_timeline, save_image, save_memo, save_timeline, str_to_time, time_to_str
 import csv
 import numpy as np
+import scipy.stats as stats
 
 input_path = "D:/movie.mp4"
 start_time = 15
@@ -85,17 +86,13 @@ def LoadVideo():
             frame_id = 0
             last_time = 9999999999999
             while frame_id < frame_count:
+                frameTimer = DebugTimer()
+                frameTimer.start()
                 
-                movie_time = start_time + (frame_id / frame_rate)
-                movie_time_text = time_to_str(movie_time)
-
-#                print(f"progress movie... {movie_time_text} / {end_time_text}")
-
                 frame = subclip.get_frame(frame_id/frame_rate)
-                input_image = crop_image(frame, (movie_x, movie_y, movie_width, movie_height))
+                input_image = crop_image(frame, (movie_x, movie_y, movie_width, movie_height))[:,:,2]
                 
-#                 cv2.imshow('image',input_image)
-#                 cv2.waitKey(0)
+                frameTimer.print("1")
 
                 
 #                if remain_time_text == "":
@@ -106,7 +103,63 @@ def LoadVideo():
                 
                 x,y,w,h = get_cost_mask_rect()
                 choppedImage = input_image[y:y+h, x:x+w]
-                #choppedImage = cv2.resize(cv2.resize(choppedImage,(100,1)),(200,21))
+                choppedImage = cv2.resize(choppedImage,(200,20))
+                
+                
+                frameTimer.print("2")
+                processedImg = np.floor(choppedImage /20).astype('uint8')*20
+                
+ 
+                sum = np.average(np.unique(processedImg[:,:]))
+
+                colsum = np.sum((choppedImage > sum),axis = 0)
+                rowsum = np.sum((choppedImage > sum),axis = 1)
+                rowmin = np.min(rowsum)
+                processedImg = ((choppedImage > sum)*255).astype('uint8')
+
+                processedImg2 = np.copy(processedImg)
+                processedImg3 = np.copy(processedImg)
+
+                for lineID in range(0,200):
+                    processedImg2[:,lineID] = (colsum[lineID] > 17)*255
+                    processedImg3[:,lineID] = (lineID < rowmin)*255
+
+                processedImg2 = processedImg2.astype('uint8')
+                processedImg3 = processedImg3.astype('uint8')
+
+                    
+                frameTimer.print("4")
+                
+                stackedImg = np.block([
+                    [choppedImage],[processedImg],[processedImg2],[processedImg3]
+                    ])
+                
+                frameTimer.print("frame")
+                cv2.imshow('image',stackedImg,)
+                cv2.waitKey(0)
+                frame_id +=1 
+                continue
+
+                for lineID in range(0,200):
+                    modeRes = stats.mode(processedImg[:,lineID])
+                    if modeRes[1] > .95:
+                        processedImg[:,lineID] = modeRes[0]
+                    else:
+                        processedImg[:,lineID] = 0
+                for lineID in range(1,200):
+                    if processedImg[0,lineID] > sum and processedImg[0,lineID -1] < sum:
+                        sum = (processedImg[0,lineID] + processedImg[0,lineID -1])/2
+                threshold =  np.copy(processedImg)
+                threshold[:,:] = sum
+                processedImg2 = np.copy(processedImg)
+                
+                for lineID in range(0,20):
+                    modeRes = stats.mode(processedImg[0,lineID*10:lineID*10 + 10])
+                    if modeRes[1] > .95:
+                        processedImg2[:,lineID*10:lineID*10 + 10] = modeRes[0]
+                    else:
+                        processedImg2[:,lineID*10:lineID*10 + 10] = 0
+                
                 
                 hsv = cv2.cvtColor(choppedImage,cv2.COLOR_RGB2HSV)
                 hls = cv2.cvtColor(choppedImage,cv2.COLOR_RGB2HLS)
@@ -169,18 +222,48 @@ def LoadVideo():
 def plot():
     x = []
     y = []
+    dydx = []
+    smooth = []
+    spike = []
+
     with open('out.csv', 'r', newline='') as csvfile:
         reader = csv.reader(csvfile)
         
         for row in reader:
+            
             x.append(float(row[2]))
             y.append(float(row[0]))
+        dydx.append(0)
+        for i in range(1,len(y)-1):
+            dy = y[i-1]-y[i+1]
+            dx = x[i-1]-x[i+1]
+            if dx == 0:
+                dx = 0.00001
+            d = dy*1000/dx
+            if(d < -1):
+                spike.append(x[i])
+            dydx.append()
+
+        dydx.append(0)
+
+        mode = stats.mode(dydx)
+        #cdydx = np.clip(dydx,mode[0]-0.2,mode[0]+.2)
+
+        #smooth = np.zeros(len(y))
+        #for i in range (len(y)-2, 1, -1):
+        #    smooth[i] = (y[i]+ y[i+1])/2
+        #for j in range (0, 5):
+        #    for i in range (len(y)-2, 1, -1):
+        #        smooth[i] = (smooth[i]+ smooth[i+1])/2
+
     plot, axis = plt.subplots()
-    axis.plot(x,y)
-    axis.set(ylim=(0,10))
+    #axis.plot(x,smooth,"g", linewidth=.5)
+    axis.plot(x,dydx,"r", linewidth=.5)
+    axis.plot(x,y,"b", linewidth=.5)
+    axis.set(ylim=(-1,10))
 
     # プロット表示(設定の反映)
     plt.show()
 
-#LoadVideo()
-plot()
+LoadVideo()
+#plot()
