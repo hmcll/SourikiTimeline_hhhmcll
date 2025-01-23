@@ -70,6 +70,7 @@ def format_time_string(time_str: str):
         return f"{time_str[:2]}:{time_str[2:4]}.{time_str[4:]}"
     else:
         return ""
+    
 def LoadVideo():
     Cost_Frame = []
     timer = DebugTimer()
@@ -86,14 +87,11 @@ def LoadVideo():
             frame_id = 0
             last_time = 9999999999999
             while frame_id < frame_count:
-                frameTimer = DebugTimer()
-                frameTimer.start()
                 
                 frame = subclip.get_frame(frame_id/frame_rate)
-                input_image = crop_image(frame, (movie_x, movie_y, movie_width, movie_height))[:,:,2]
+                input_image = crop_image(frame, (movie_x, movie_y, movie_width, movie_height))
                 
-                frameTimer.print("1")
-
+                
                 
 #                if remain_time_text == "":
 #                    frame_id += 15
@@ -101,28 +99,71 @@ def LoadVideo():
 #                percentTimer = DebugTimer()
 #                percentTimer.start()
                 
+                
                 x,y,w,h = get_cost_mask_rect()
-                choppedImage = input_image[y:y+h, x:x+w]
+                choppedImage = input_image[y:y+h, x:x+w,2]
                 choppedImage = cv2.resize(choppedImage,(200,20))
                 
                 
-                frameTimer.print("2")
+                
                 processedImg = np.floor(choppedImage /20).astype('uint8')*20
                 
  
                 sum = np.average(np.unique(processedImg[:,:]))
 
                 colsum = np.sum((choppedImage > sum),axis = 0)
-                rowsum = np.sum((choppedImage > sum),axis = 1)
-                rowmin = np.min(rowsum)
+                
                 processedImg = ((choppedImage > sum)*255).astype('uint8')
+                endID = 20
+                for blockID in range(20):
+                    BlockSum = 0
+                    for lineID in range(10):
+                        if colsum[lineID + blockID * 10] > 18:
+                            BlockSum += 1
+                    if BlockSum == 0:
+                        endID = (blockID + 1)*10
+                        break
+                cost = 0
+                for lineID in range(endID-1,0,-1):
+                    if colsum[lineID] > 17:
+                        cost = lineID / 200
+                        break
+                cost = np.round(cost * 10, 1)
+                if cost != last_cost:
+                    
+                    if cost != Cost_Frame[len(Cost_Frame -2)][0]:
 
-                processedImg2 = np.copy(processedImg)
-                processedImg3 = np.copy(processedImg)
+                    time_image = crop_image(input_image, mask_time_rect)
+                    time_texts = ocr_image(time_image, None, 'en')
+                    remain_time_text = format_time_string("".join(time_texts))
+                    if(remain_time_text != ""):
+                        s1 = remain_time_text.split(":")
+                        if len(s1) == 2:
+                            s2 = s1[1].split(".")
+                            if len(s2) == 2:
+                                time = float(s1[0]) * 60000 + float(s2[0])* 1000 + float(s2[1])
+                                if time <= last_time:
+                                    last_time = time
+                                    Cost_Frame.append([last_cost,frame_id,time])
+                                    last_cost = cost
+                                    frame_id += 1
+                                    continue
+                    frame_id += 15
+                    continue
+                    
+                frame_id += 1
 
-                for lineID in range(0,200):
+                continue
+
+                processedImg2 = np.zeros([20,200])
+                processedImg3 = np.zeros([20,200])
+
+
+                for lineID in range(0,endID):
                     processedImg2[:,lineID] = (colsum[lineID] > 17)*255
-                    processedImg3[:,lineID] = (lineID < rowmin)*255
+                    processedImg3[:,lineID] = (lineID < endID)*255
+
+
 
                 processedImg2 = processedImg2.astype('uint8')
                 processedImg3 = processedImg3.astype('uint8')
@@ -137,8 +178,7 @@ def LoadVideo():
                 frameTimer.print("frame")
                 cv2.imshow('image',stackedImg,)
                 cv2.waitKey(0)
-                frame_id +=1 
-                continue
+
 
                 for lineID in range(0,200):
                     modeRes = stats.mode(processedImg[:,lineID])
@@ -242,7 +282,7 @@ def plot():
             d = dy*1000/dx
             if(d < -1):
                 spike.append(x[i])
-            dydx.append()
+            dydx.append(d)
 
         dydx.append(0)
 
@@ -265,5 +305,5 @@ def plot():
     # プロット表示(設定の反映)
     plt.show()
 
-LoadVideo()
-#plot()
+#LoadVideo()
+plot()

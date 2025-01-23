@@ -21,11 +21,10 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
     runner_params.imgui_window_params.show_menu_bar = False
     runner_params.imgui_window_params.show_status_bar = False
     
-    
     runner_params.imgui_window_params.default_imgui_window_type = (
         hello_imgui.DefaultImGuiWindowType.provide_full_screen_dock_space
     )
-    
+    static.noclose = True
     runner_params.imgui_window_params.enable_viewports = False
 
 
@@ -40,6 +39,7 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
             
             if imgui.get_frame_count() < 2:  # cf https://github.com/pthom/imgui_bundle/issues/293
                 return
+            
             gui_func()
 
         window.gui_function = win_fn
@@ -79,8 +79,10 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
 
 def main():
     runner_params, addons = make_params()
+
+
     immapp.run(runner_params=runner_params, add_ons_params=addons)
-
-
+    
+    
 if __name__ == "__main__":
     main()
