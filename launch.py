@@ -24,7 +24,7 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
     runner_params.imgui_window_params.default_imgui_window_type = (
         hello_imgui.DefaultImGuiWindowType.provide_full_screen_dock_space
     )
-    static.noclose = True
+    
     runner_params.imgui_window_params.enable_viewports = False
 
 
@@ -79,8 +79,6 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
 
 def main():
     runner_params, addons = make_params()
-
-
     immapp.run(runner_params=runner_params, add_ons_params=addons)
     
     
