@@ -46,11 +46,9 @@ def get_video_info(url):
         info = ydl.extract_info(url, download=False)
         jsonRet = json.loads(json.dumps(ydl.sanitize_info(info)))
         title = jsonRet['title']
-        print(jsonRet)
-
-        thumbnail_url = jsonRet['thumbnail']
-
-    return title,  thumbnail_url
+        
+        
+    return title, jsonRet
 
 def ydl_download(url, output_path):
     if os.path.exists(output_path):
