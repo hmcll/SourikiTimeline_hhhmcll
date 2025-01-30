@@ -2,7 +2,7 @@
 
 from types import ModuleType
 from typing import List, Callable
-from imgui_bundle import imgui, hello_imgui, immapp, imgui_ctx
+from imgui_bundle import imgui, hello_imgui, immapp, imgui_ctx, immvision
 from imgui_bundle.immapp import static
 import imgui_windows.download_window as download_window
 
@@ -64,6 +64,7 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
         dockable_windows.append(window)
 
     windows = [
+        ["Download", download_window.gui],
         ["Download", download_window.gui]
     ]
 
@@ -94,6 +95,7 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
     addons.with_implot = True
     addons.with_implot3d = True
     addons.with_tex_inspect = True
+    immvision.use_bgr_color_order()
 
     return runner_params, addons
 

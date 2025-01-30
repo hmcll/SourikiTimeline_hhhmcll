@@ -1,15 +1,20 @@
 from imgui_bundle import imgui
 from imgui_bundle.immapp import static
+from imgui_bundle import immvision
 import os
 import json
+import cv2
+import numpy as np
 import requests
+
 from scripts.media_utils import ydl_download, get_video_info
+
 
 def CreateNewProject(link : str, ProjectFolderLink : str):
     title,  jsonRet = get_video_info(link)
     if title is not None:
         ydl_download(link, ProjectFolderLink + "\\" + title + "\\video.mp4")
-        setting = json.loads("{}")
+        setting = {}
         setting["title"] = jsonRet["title"]
         setting["movie_width"] = jsonRet["width"]
         setting["movie_height"] = jsonRet["height"]
@@ -21,16 +26,12 @@ def CreateNewProject(link : str, ProjectFolderLink : str):
         with open(ProjectFolderLink + "\\" + title + "\\thumbnail.jpg", "wb") as file:
             file.write(response.content)   
             
-        with open(ProjectFolderLink + "\\" + title + "\\setting.json", "w") as file:
-            json.dumps(setting,file, ensure_ascii=False, indent=4)
-            file.write(response.content)     
+        with open(ProjectFolderLink + "\\" + title + "\\setting.json", "w",encoding="utf-8") as file:
+            json.dump(setting,file, ensure_ascii=False, indent=4)
+            
         print(jsonRet)
-
-def gui():
-    savePath = os.path.normpath(os.path.dirname(__file__) + "\\..\\Projects")
-    imgui.text("Workspace: " + savePath)
-    if not os.path.exists(savePath):
-        os.mkdir(savePath)
+def GetAllProjects(savePath: str) -> list:
+    paths = []
     for name in os.walk(savePath).__next__()[1]:
         videoFile = False
         settingFile = False
@@ -43,17 +44,42 @@ def gui():
                 if file == "setting.json":
                     settingFile = True
         if videoFile and settingFile:
-            imgui.text(savePath + "\\" + name)
+            paths.append(savePath + "\\" + name)
             continue
-        
+    return paths
 
+def gui():
+    savePath = os.path.normpath(os.path.dirname(__file__) + "\\..\\Projects")
+    imgui.text("ワークスペース: " + savePath)
+    if not os.path.exists(savePath):
+        os.mkdir(savePath)
+    
+    if not hasattr(static, 'projectID'):
+        static.projectID = 0
+        selectedNewProject = True
+    paths = GetAllProjects(savePath)
+    selectedNewProject = False
+    imgui.begin_horizontal("プロジェクト")
+    if imgui.begin_list_box("##プロジェクトリスト"):
+        for n, item in enumerate(paths):
+            isSelected = static.projectID == n
+            if imgui.selectable(item, isSelected)[1]:
+                static.projectID = n
+                selectedNewProject = True
+        imgui.end_list_box()
         
+    if selectedNewProject:
+        with open(paths[static.projectID] + "\\thumbnail.jpg", "rb") as file:
+            static.previewImg = cv2.imdecode(np.fromstring(file.read(), np.uint8),1)
+    immvision.image_display("##preview", static.previewImg,(320,180),selectedNewProject)
+    imgui.end_horizontal()
+    imgui.button("このプロジェクトで続く")
 
     if not hasattr(static, 'videoLinkToDownload'):
-        static.videoLinkToDownload = "https://www.youtube.com/watch?v=idZov-CjcHA"#"Set Link Here"
-    changed, static.videoLinkToDownload = imgui.input_text("Video Link", static.videoLinkToDownload)
+        static.videoLinkToDownload = "https://www.youtube.com/watch?v=cQV0FF0zPH4"#"Set Link Here"
+    _, static.videoLinkToDownload = imgui.input_text("##YouTubeリンクをここに", static.videoLinkToDownload)
 
-    if imgui.button("Print"):
+    if imgui.button("ダウンロード"):
 
         CreateNewProject(static.videoLinkToDownload, savePath)
     
