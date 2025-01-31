@@ -11,3 +11,4 @@ pyGLM
 moviepy
 matplotlib
 numpy
+decord

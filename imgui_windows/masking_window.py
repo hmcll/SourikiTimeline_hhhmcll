@@ -9,6 +9,7 @@ import imgui_windows.download_window as download_window
 import launch 
 import threading
 import time
+import decord
 
 from scripts.debug_timer import DebugTimer
 
@@ -18,12 +19,8 @@ class videoStatus:
     frameWidth : int
     frameHeight : int
 
-videoFile : cv2.VideoCapture | None = None
+videoFile : decord.VideoReader | None = None
 
-def renderThread(fps : int):
-    waitTime = 1.0/fps
-    while launch.currentWindowID == 1:
-        pass
 
 def gui():
     
@@ -32,31 +29,32 @@ def gui():
     if not hasattr(static, 'currentFrameID') or static.currentFrameID == -1:
         static.currentFrameID = -1
         static.sliderID = 0
+        static.sliderChanged = False
     
     if videoFile is None:
-        videoFile = cv2.VideoCapture(download_window.selectedProject + "\\video.mp4")
-        static.frameCount = int(videoFile.get(cv2.CAP_PROP_FRAME_COUNT))
+        videoFile = decord.VideoReader(download_window.selectedProject + "\\video.mp4")
+
+        static.frameCount = len(videoFile)
         
-        #frameWidth = int(videoFile.get(cv2.CAP_PROP_FRAME_WIDTH))
-        #frameHeight = int(videoFile.get(cv2.CAP_PROP_FRAME_HEIGHT))
         static.frameWidth = 1280
         static.frameHeight = 720
         
         
-    static.sliderChanged, static.sliderID = imgui.slider_int("Time",static.sliderID, 0 , static.frameCount)
     if not static.sliderChanged and static.currentFrameID != static.sliderID:
         timer = DebugTimer()
         timer.start()
         static.currentFrameID = static.sliderID
-        videoFile.set(cv2.CAP_PROP_POS_FRAMES, static.currentFrameID)
-        success, static.frameImg = videoFile.read()
+        
+        static.frameImg = videoFile[static.currentFrameID].asnumpy()
         timer.print("loaded")
-        if success:
-            immvision.image_display("frame", static.frameImg,(static.frameWidth , static.frameHeight),refresh_image = True)
-            timer.print("end")
+        
+        immvision.image_display("frame", static.frameImg,(static.frameWidth , static.frameHeight),refresh_image = True)
+        timer.print("end")
     else:
         immvision.image_display("frame", static.frameImg,(static.frameWidth , static.frameHeight),refresh_image = True)
 
+    static.sliderChanged, static.sliderID = imgui.slider_int("Time",static.sliderID, 0 , static.frameCount)
+    
             
     
     return -1

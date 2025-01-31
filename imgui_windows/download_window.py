@@ -72,7 +72,7 @@ def gui():
         
     if selectedNewProject:
         with open(paths[static.projectID] + "\\thumbnail.jpg", "rb") as file:
-            static.previewImg = cv2.imdecode(np.fromstring(file.read(), np.uint8),1)
+            static.previewImg = cv2.cvtColor(cv2.imdecode(np.fromstring(file.read(), np.uint8),1),cv2.COLOR_BGR2RGB)
     immvision.image_display("##preview", static.previewImg,(320,180),selectedNewProject)
     imgui.end_horizontal()
     if imgui.button("このプロジェクトで続く"):
