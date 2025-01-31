@@ -9,6 +9,7 @@ import requests
 
 from scripts.media_utils import ydl_download, get_video_info
 
+selectedProject = ""
 
 def CreateNewProject(link : str, ProjectFolderLink : str):
     title,  jsonRet = get_video_info(link)
@@ -49,6 +50,7 @@ def GetAllProjects(savePath: str) -> list:
     return paths
 
 def gui():
+    ret = -1
     savePath = os.path.normpath(os.path.dirname(__file__) + "\\..\\Projects")
     imgui.text("ワークスペース: " + savePath)
     if not os.path.exists(savePath):
@@ -73,7 +75,10 @@ def gui():
             static.previewImg = cv2.imdecode(np.fromstring(file.read(), np.uint8),1)
     immvision.image_display("##preview", static.previewImg,(320,180),selectedNewProject)
     imgui.end_horizontal()
-    imgui.button("このプロジェクトで続く")
+    if imgui.button("このプロジェクトで続く"):
+        global selectedProject 
+        selectedProject = paths[static.projectID]
+        ret = 1
 
     if not hasattr(static, 'videoLinkToDownload'):
         static.videoLinkToDownload = "https://www.youtube.com/watch?v=cQV0FF0zPH4"#"Set Link Here"
@@ -82,6 +87,8 @@ def gui():
     if imgui.button("ダウンロード"):
 
         CreateNewProject(static.videoLinkToDownload, savePath)
+
+    return ret
     
 
 #https://www.youtube.com/watch?v=idZov-CjcHA

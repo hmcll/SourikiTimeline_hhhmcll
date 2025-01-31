@@ -5,7 +5,9 @@ from typing import List, Callable
 from imgui_bundle import imgui, hello_imgui, immapp, imgui_ctx, immvision
 from imgui_bundle.immapp import static
 import imgui_windows.download_window as download_window
+import imgui_windows.masking_window as masking_window
 
+currentWindowID = 0
 
 def load_font(font : imgui.ImFont):
     hello_imgui.set_assets_folder(".")
@@ -48,29 +50,27 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
 
     dockable_windows: List[hello_imgui.DockableWindow] = []
 
-    def add_dockable_window(label: str, gui_func):
-        window = hello_imgui.DockableWindow()
-        window.label = label
-        window.dock_space_name = "MainDockSpace"
+
+
+    windows = [ download_window.gui, masking_window.gui]
+    
+    
+    window = hello_imgui.DockableWindow()
+    window.label = "main"
+    window.dock_space_name = "MainDockSpace"
+    
+    def win_fn() -> None:
+        global currentWindowID
+        if imgui.get_frame_count() < 2:  # cf https://github.com/pthom/imgui_bundle/issues/293
+            return
+        ret = windows[currentWindowID]()
+        if ret != -1:
+            currentWindowID = ret
         
-        def win_fn() -> None:
-            
-            if imgui.get_frame_count() < 2:  # cf https://github.com/pthom/imgui_bundle/issues/293
-                return
-            gui_func()
-            
 
-        window.gui_function = win_fn
-        dockable_windows.append(window)
-
-    windows = [
-        ["Download", download_window.gui],
-        ["Download", download_window.gui]
-    ]
-
-    for window in windows:
-        add_dockable_window(window[0],window[1])
-
+    window.gui_function = win_fn
+    dockable_windows.append(window)
+    
     runner_params.docking_params.dockable_windows = dockable_windows
 
     # the main gui is only responsible to give focus to ImGui Bundle dockable window
