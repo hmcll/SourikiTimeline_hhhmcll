@@ -21,6 +21,10 @@ class videoStatus:
 
 videoFile : decord.VideoReader | None = None
 
+def drawRectangles(staticVariables):
+    staticVariables.frameImg = np.copy(staticVariables.rawFrameImg)
+    cv2.rectangle(staticVariables.frameImg, (static.timeBoxx, static.timeBoxy),(static.timeBoxx + static.timeBoxw, static.timeBoxy + static.timeBoxh),(255,0,0),2)
+
 
 def gui():
     
@@ -35,26 +39,52 @@ def gui():
         videoFile = decord.VideoReader(download_window.selectedProject + "\\video.mp4")
 
         static.frameCount = len(videoFile)
-        
-        static.frameWidth = 1280
-        static.frameHeight = 720
-        
-        
+        frame = videoFile[static.currentFrameID]
+        static.frameWidth = frame.shape[1]
+        static.frameHeight = frame.shape[0]
+        static.timeBoxx = 10
+        static.timeBoxy = 10
+        static.timeBoxw = 50
+        static.timeBoxh = 50
+    windowWidth = imgui.get_content_region_avail().x
+    videoViewWidth = int(windowWidth / 5 * 3)
+    videoHeight = int(videoViewWidth / 16 * 9)
     if not static.sliderChanged and static.currentFrameID != static.sliderID:
         timer = DebugTimer()
         timer.start()
         static.currentFrameID = static.sliderID
         
-        static.frameImg = videoFile[static.currentFrameID].asnumpy()
+        static.rawFrameImg = videoFile[static.currentFrameID].asnumpy()
         timer.print("loaded")
-        
-        immvision.image_display("frame", static.frameImg,(static.frameWidth , static.frameHeight),refresh_image = True)
+        drawRectangles(static)
+        immvision.image_display("frame", static.frameImg,(videoViewWidth, videoHeight), refresh_image = True)
         timer.print("end")
     else:
-        immvision.image_display("frame", static.frameImg,(static.frameWidth , static.frameHeight),refresh_image = True)
+        immvision.image_display("frame", static.frameImg,(videoViewWidth, videoHeight), refresh_image = True)
 
+    imgui.push_item_width(windowWidth)
     static.sliderChanged, static.sliderID = imgui.slider_int("Time",static.sliderID, 0 , static.frameCount)
     
-            
+    itemWidth = (windowWidth - 100 ) / 4
+    imgui.push_item_width(100)
+    imgui.text("時間")
+    imgui.same_line()
+    imgui.push_item_width(itemWidth)
+    changeda, static.timeBoxx = imgui.slider_int("x##time", static.timeBoxx, 0, static.frameWidth - static.timeBoxw  , flags = imgui.SliderFlags_.always_clamp)
+    imgui.same_line()
+    imgui.push_item_width(itemWidth)
+    changedb, static.timeBoxw = imgui.slider_int("w##time", static.timeBoxw, 0, static.frameWidth - static.timeBoxx  , flags = imgui.SliderFlags_.always_clamp)
+    imgui.same_line()
+    imgui.push_item_width(itemWidth)
+    changedc, static.timeBoxy = imgui.slider_int("y##time", static.timeBoxy, 0, static.frameHeight - static.timeBoxh , flags = imgui.SliderFlags_.always_clamp)
+    imgui.same_line()
+    imgui.push_item_width(itemWidth)
+    changedd, static.timeBoxh = imgui.slider_int("h##time", static.timeBoxh, 0, static.frameHeight - static.timeBoxy , flags = imgui.SliderFlags_.always_clamp)
     
+    
+
+    if changeda or changedb or changedc or changedd:
+        drawRectangles(static)
+
+
     return -1
