@@ -8,7 +8,9 @@ import numpy as np
 import imgui_windows.download_window as download_window
 
 import threading
+import imgui_windows.ocr_utils as ocr_utils
 import csv
+import importlib
 
 costBox = [1254,941,int(468),int(25)]
 
@@ -16,8 +18,11 @@ totalTime = 198
 
 videoFile : cv2.VideoCapture | None = None
 
+videoProgress = 0
 
 def LoadVideo():
+    global videoProgress
+    videoProgress = 0
     Cost_Frame = []
     global videoFile
     global totalTime
@@ -29,41 +34,18 @@ def LoadVideo():
     frame_id = 0
     last_time = 9999999999999
     while frame_id < frame_count:
-        if(frame_id %50) == 0:
-            print(frame_id)
+            
+        videoProgress = (frame_id / frame_count) * 100
+        print(videoProgress)
         success, frame = videoFile.read()
         if not success:
             frame_id+=10
             continue
         
         x,y,w,h = costBox
-        choppedImage = frame[y:y+h, x:x+w,2]
-        choppedImage = cv2.resize(choppedImage,(200,20))
+        choppedImage = frame[y:y+h, x:x+w,0]
+        cost = ocr_utils.calculateCost(choppedImage)
         
-        
-        processedImg = np.floor(choppedImage /20).astype('uint8')*20
-        
-
-        sum = np.average(np.unique(processedImg[:,:]))
-
-        colsum = np.sum((choppedImage > sum),axis = 0)
-        
-        processedImg = ((choppedImage > sum)*255).astype('uint8')
-        endID = 20
-        for blockID in range(20):
-            BlockSum = 0
-            for lineID in range(10):
-                if colsum[lineID + blockID * 10] > 18:
-                    BlockSum += 1
-            if BlockSum == 0:
-                endID = (blockID + 1)*10
-                break
-        cost = 0
-        for lineID in range(endID-1,0,-1):
-            if colsum[lineID] > 17:
-                cost = lineID / 200
-                break
-        cost = np.round(cost * 10, 1)
         if cost != last_cost:
             last_cost = cost
             Cost_Frame.append([last_cost,frame_id])
@@ -80,10 +62,11 @@ def LoadVideo():
         for row in Cost_Frame:
             spamwriter.writerow(row)
     return Cost_Frame
+
 def gui():
     global costBox
     global totalTime
-    
+    global videoProgress
     global videoFile
 
     if not hasattr(static, 'currentFrameID') or static.currentFrameID == -1:
@@ -142,21 +125,62 @@ def gui():
     immvision.image_display("frameg1", np.ascontiguousarray (static.frameImg[:,:,2] - static.frameImg[:,:,0]),(costBox[2], costBox[3]), refresh_image = True)
     imgui.same_line()
     
-    immvision.image_display("frameb1", np.ascontiguousarray (static.frameImg[:,:,0]),(costBox[2], costBox[3]), refresh_image = True)
+    immvision.image_display("frameb1", np.ascontiguousarray ((np.floor(static.frameImg[:,:,0] / 20) * 20 > (256 /2)).astype('uint8') * 255),(costBox[2], costBox[3]), refresh_image = True)
     imgui.same_line()
     imgui.push_item_width(200)
     imgui.spacing()
 
-    imgui.push_item_width(windowWidth)
-    static.sliderChanged, static.sliderID = imgui.slider_int("Time",static.sliderID, 0 , static.frameCount)
-    
-    if imgui.button("キャプチャー"):
-        LoadVideo()
         
+    imgui.begin_horizontal("TimeControl")
+    static.sliderChanged = False
+
+    imgui.push_item_width(100)
+    if imgui.button("<##Time"):
+        static.sliderChanged = True
+        static.sliderID -= 1
+
+    imgui.push_item_width(windowWidth - 200)
+
+    changed, static.sliderID = imgui.slider_int("Time",static.sliderID, 0 , static.frameCount)
+    static.sliderChanged |= changed 
+
+    imgui.push_item_width(100)
+
+    if imgui.button(">##Time"):
+        static.sliderChanged = True
+        static.sliderID += 1
+
+    imgui.end_horizontal()
+
+    if imgui.button("キャプチャー"):
+        if not hasattr(static, 'loadVideoThread'):
+            static.loadVideoThread = threading.Thread(target=LoadVideo, args= ())
+            static.loadVideoThread.start()
+        elif not static.loadVideoThread.is_alive() and videoProgress <= 0:
+                
+            static.loadVideoThread.start()
+
+    if videoProgress > 0 and not static.loadVideoThread.is_alive():
+        with open('out.csv', 'r', newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            static.x = []
+            static.y = []
+            for row in reader:
+                static.x.append(float(row[0]))
+                static.y.append(float(row[1]))
+        videoProgress = 0
+
+    imgui.same_line()
+    imgui.text(str(videoProgress))
         
     if hasattr(static, 'x'):
         if implot.begin_plot("##cost plot"):
+            implot.setup_axes("frame", "cost", implot.AxisFlags_.range_fit,implot.AxisFlags_.lock_min | implot.AxisFlags_.lock_max)
+            implot.setup_axis_limits(implot.ImAxis_.y1, 0,10)
             implot.plot_inf_lines("frame",np.asarray([static.currentFrameID]))
             implot.plot_line("cost",np.asarray(static.y),np.asarray(static.x))
             implot.end_plot()
+    imgui.text("Cost :" + str( ocr_utils.calculateCost(static.frameImg[:,:,0])))
+    if imgui.button("reload lib"):
+        importlib.reload(ocr_utils)
     return 2
