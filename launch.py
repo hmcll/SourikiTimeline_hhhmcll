@@ -6,6 +6,7 @@ from imgui_bundle import imgui, hello_imgui, immapp, imgui_ctx, immvision
 from imgui_bundle.immapp import static
 import imgui_windows.download_window as download_window
 import imgui_windows.masking_window as masking_window
+import imgui_windows.timeline_window as timeline_window
 
 currentWindowID = 0
 
@@ -52,7 +53,7 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
 
 
 
-    windows = [ download_window.gui, masking_window.gui]
+    windows = [ download_window.gui, masking_window.gui, timeline_window.gui]
     
     
     window = hello_imgui.DockableWindow()
@@ -95,7 +96,7 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
     addons.with_implot = True
     addons.with_implot3d = True
     addons.with_tex_inspect = True
-    immvision.use_rgb_color_order()
+    immvision.use_bgr_color_order()
 
     return runner_params, addons
 

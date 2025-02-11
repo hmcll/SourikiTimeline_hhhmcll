@@ -1,12 +1,19 @@
 import cv2
 import numpy as np
 def calculateCost(choppedImage):
+    
     choppedImage = cv2.resize(choppedImage,(200,20))
+    
+    framediff = np.linalg.norm(choppedImage - [243,222,68],axis=2) / 1.8
+
+    bluediff = np.abs(choppedImage[:,:,0] - 243)
+
+    min = np.min([framediff, bluediff],axis= 0)
     
     threshold = 25
     
     # optimizable
-    colsum = np.sum((choppedImage > threshold),axis = 0)
+    colsum = np.sum((min > threshold),axis = 0)
     
     
     id = 199

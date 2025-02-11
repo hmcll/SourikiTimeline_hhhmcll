@@ -10,6 +10,8 @@ import launch
 import threading
 import time
 import decord
+from decord import cpu
+import scripts.ocr_utils as ocr
 
 from scripts.debug_timer import DebugTimer
 
@@ -23,8 +25,60 @@ videoFile : decord.VideoReader | None = None
 
 def drawRectangles(staticVariables):
     staticVariables.frameImg = np.copy(staticVariables.rawFrameImg)
-    cv2.rectangle(staticVariables.frameImg, (static.timeBoxx, static.timeBoxy),(static.timeBoxx + static.timeBoxw, static.timeBoxy + static.timeBoxh),(255,0,0),2)
+    cv2.rectangle(staticVariables.frameImg, (static.config['timeBoxx'], static.config['timeBoxy']),(static.config['timeBoxx'] + static.config['timeBoxw'], static.config['timeBoxy'] + static.config['timeBoxh']),(255,0,0),2)
+    cv2.rectangle(staticVariables.frameImg, (static.config['skillBoxx'], static.config['skillBoxy']),(static.config['skillBoxx'] + static.config['skillBoxw'], static.config['skillBoxy'] + static.config['skillBoxh']),(0,255,0),2)
+    cv2.rectangle(staticVariables.frameImg, (static.config['costBoxx'], static.config['costBoxy']),(static.config['costBoxx'] + static.config['costBoxw'], static.config['costBoxy'] + static.config['costBoxh']),(0,255,0),2)
 
+def sliderInt4(tag, itemWidth, itemValues, frameValues):
+    imgui.push_item_width(100)
+    imgui.text(tag)
+    imgui.same_line()
+    imgui.push_item_width(itemWidth)
+    changeda, itemValues[0] = imgui.slider_int("x##" + tag, itemValues[0], 0, frameValues[0] - itemValues[1]  , flags = imgui.SliderFlags_.always_clamp)
+    imgui.same_line()
+    imgui.push_item_width(itemWidth)
+    changedb, itemValues[1] = imgui.slider_int("w##" + tag, itemValues[1], 0, frameValues[0] - itemValues[0]  , flags = imgui.SliderFlags_.always_clamp)
+    imgui.same_line()
+    imgui.push_item_width(itemWidth)
+    changedc, itemValues[2] = imgui.slider_int("y##" + tag, itemValues[2], 0, frameValues[1] - itemValues[3] , flags = imgui.SliderFlags_.always_clamp)
+    imgui.same_line()
+    imgui.push_item_width(itemWidth)
+    changedd, itemValues[3] = imgui.slider_int("h##" + tag, itemValues[3], 0, frameValues[1] - itemValues[2] , flags = imgui.SliderFlags_.always_clamp)
+    
+    return changeda or changedb or changedc or changedd, itemValues
+
+def getCost(choppedImage, totalCost):
+    vertSize = 20
+    epsilon = 2
+    choppedImage = cv2.resize(choppedImage,(totalCost * 10,vertSize))
+    processedImg = np.floor(choppedImage /(totalCost * 2)).astype('uint8')*(totalCost*2)
+    
+    sum = np.average(np.unique(processedImg[:,:]))
+
+    colsum = np.sum((choppedImage > sum),axis = 0)
+    
+    processedImg = ((choppedImage > sum)*255).astype('uint8')
+    endID = (totalCost * 2)
+    for blockID in range((totalCost * 2)):
+        BlockSum = 0
+        for lineID in range(totalCost):
+            if colsum[lineID + blockID * totalCost] > vertSize - epsilon:
+                BlockSum += 1
+        if BlockSum == 0:
+            endID = (blockID + 1)*totalCost
+            break
+    cost = 0
+    for lineID in range(endID-1,0,-1):
+        if colsum[lineID] > vertSize - epsilon:
+            cost = lineID / (totalCost * 10)
+            break
+    cost = np.round(cost * totalCost, 1)
+    return cost
+
+def runOCR(config, frame):
+
+    choppedImage = frame[config['costBoxy']:config['costBoxy']+config['costBoxh'], config['costBoxx']:config['costBoxx']+config['costBoxw'],2]
+    return getCost(choppedImage, 10)
 
 def gui():
     
@@ -36,19 +90,19 @@ def gui():
         static.sliderChanged = False
     
     if videoFile is None:
-        videoFile = decord.VideoReader(download_window.selectedProject + "\\video.mp4")
-
+        videoFile = decord.VideoReader(download_window.selectedProject + "\\video.mp4", ctx=cpu(0), num_threads=1)
+        
         static.frameCount = len(videoFile)
-        frame = videoFile[static.currentFrameID]
-        static.frameWidth = frame.shape[1]
-        static.frameHeight = frame.shape[0]
-        static.timeBoxx = 10
-        static.timeBoxy = 10
-        static.timeBoxw = 50
-        static.timeBoxh = 50
+        
+        with open(download_window.selectedProject + "\\setting.json", "r",encoding="utf-8") as file:
+            static.config = json.load(file)
+        
+        
+        
     windowWidth = imgui.get_content_region_avail().x
     videoViewWidth = int(windowWidth / 5 * 3)
     videoHeight = int(videoViewWidth / 16 * 9)
+    
     if not static.sliderChanged and static.currentFrameID != static.sliderID:
         timer = DebugTimer()
         timer.start()
@@ -59,6 +113,7 @@ def gui():
         drawRectangles(static)
         immvision.image_display("frame", static.frameImg,(videoViewWidth, videoHeight), refresh_image = True)
         timer.print("end")
+        
     else:
         immvision.image_display("frame", static.frameImg,(videoViewWidth, videoHeight), refresh_image = True)
 
@@ -66,25 +121,30 @@ def gui():
     static.sliderChanged, static.sliderID = imgui.slider_int("Time",static.sliderID, 0 , static.frameCount)
     
     itemWidth = (windowWidth - 100 ) / 4
-    imgui.push_item_width(100)
-    imgui.text("時間")
-    imgui.same_line()
-    imgui.push_item_width(itemWidth)
-    changeda, static.timeBoxx = imgui.slider_int("x##time", static.timeBoxx, 0, static.frameWidth - static.timeBoxw  , flags = imgui.SliderFlags_.always_clamp)
-    imgui.same_line()
-    imgui.push_item_width(itemWidth)
-    changedb, static.timeBoxw = imgui.slider_int("w##time", static.timeBoxw, 0, static.frameWidth - static.timeBoxx  , flags = imgui.SliderFlags_.always_clamp)
-    imgui.same_line()
-    imgui.push_item_width(itemWidth)
-    changedc, static.timeBoxy = imgui.slider_int("y##time", static.timeBoxy, 0, static.frameHeight - static.timeBoxh , flags = imgui.SliderFlags_.always_clamp)
-    imgui.same_line()
-    imgui.push_item_width(itemWidth)
-    changedd, static.timeBoxh = imgui.slider_int("h##time", static.timeBoxh, 0, static.frameHeight - static.timeBoxy , flags = imgui.SliderFlags_.always_clamp)
-    
-    
 
-    if changeda or changedb or changedc or changedd:
+    changeda, [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']] = sliderInt4("時間", itemWidth, 
+             [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']],
+            [static.config['movie_width'], static.config['movie_height']])
+    
+    changedb, [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']] = sliderInt4("スキル", itemWidth, 
+            [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']],
+            [static.config['movie_width'], static.config['movie_height']])
+    
+    changedc, [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']] = sliderInt4("コスト", itemWidth, 
+             [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']],
+            [static.config['movie_width'], static.config['movie_height']])
+    
+    if changeda or changedb or changedc:
         drawRectangles(static)
-
+    if imgui.button("セーブ"):
+        
+        with open(download_window.selectedProject + "\\setting.json", "w",encoding="utf-8") as file:
+            json.dump(static.config,file, ensure_ascii=False, indent=4)
+            
+            
+    if imgui.button("識別"):
+        static.cost = runOCR(static.config, static.rawFrameImg)
+            
+    
 
     return -1

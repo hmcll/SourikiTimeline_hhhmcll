@@ -10,27 +10,27 @@ import csv
 import numpy as np
 import scipy.stats as stats
 
-input_path = "D:/movie.mp4"
-start_time = 15
-frame_rate = 60
+input_path = ".\\video.mp4"
+start_time = 0
+frame_rate = 30
 
 movie_x= 0
 movie_y=0
-movie_width= 1728
-movie_height= 1080
+movie_width= 1920
+movie_height= 822
 
 mask_image_w = 1920
-mask_image_h = 1080
+mask_image_h = 822
 
-mask_cost_x= 1241
-mask_cost_y= 1024
-mask_cost_w= 476
-mask_cost_h= 24
+mask_cost_x= 1250
+mask_cost_y= 771
+mask_cost_w= 428
+mask_cost_h= 23
 
-mask_time_x = 1629
-mask_time_y = 29
-mask_time_w = 183
-mask_time_h = 56
+mask_time_x = 1594
+mask_time_y = 154
+mask_time_w = 154
+mask_time_h = 50
 
 def get_movie_size():
     return (movie_width, movie_height)
@@ -104,11 +104,8 @@ def LoadVideo():
                 choppedImage = input_image[y:y+h, x:x+w,2]
                 choppedImage = cv2.resize(choppedImage,(200,20))
                 
-                
-                
                 processedImg = np.floor(choppedImage /20).astype('uint8')*20
                 
- 
                 sum = np.average(np.unique(processedImg[:,:]))
 
                 colsum = np.sum((choppedImage > sum),axis = 0)
@@ -131,7 +128,7 @@ def LoadVideo():
                 cost = np.round(cost * 10, 1)
                 if cost != last_cost:
                     
-                    if cost != Cost_Frame[len(Cost_Frame -2)][0]:
+                    #if cost != Cost_Frame[len(Cost_Frame -2)][0]:
 
                     time_image = crop_image(input_image, mask_time_rect)
                     time_texts = ocr_image(time_image, None, 'en')
@@ -148,6 +145,7 @@ def LoadVideo():
                                     last_cost = cost
                                     frame_id += 1
                                     continue
+
                     frame_id += 15
                     continue
                     
@@ -305,5 +303,5 @@ def plot():
     # プロット表示(設定の反映)
     plt.show()
 
-#LoadVideo()
-plot()
+LoadVideo()
+#plot()
