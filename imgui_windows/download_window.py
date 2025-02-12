@@ -7,6 +7,9 @@ import cv2
 import numpy as np
 import requests
 
+from io import StringIO
+import sys
+import threading
 
 
 from scripts.media_utils import ydl_download, get_video_info
@@ -14,7 +17,11 @@ from scripts.media_utils import ydl_download, get_video_info
 selectedProject = ""
 
 def CreateNewProject(link : str, ProjectFolderLink : str):
-    title,  jsonRet = get_video_info(link)
+    try:
+        title,  jsonRet = get_video_info(link)
+    except:
+        print("リンク無効")
+        return
     if title is not None:
         ydl_download(link, ProjectFolderLink + "\\" + title + "\\video.mp4")
         setting = {}
@@ -50,8 +57,10 @@ def CreateNewProject(link : str, ProjectFolderLink : str):
             
         with open(ProjectFolderLink + "\\" + title + "\\setting.json", "w",encoding="utf-8") as file:
             json.dump(setting,file, ensure_ascii=False, indent=4)
+        
+    print("ダウンロード完了")
             
-        print(jsonRet)
+            
 def GetAllProjects(savePath: str) -> list:
     paths = []
     for name in os.walk(savePath).__next__()[1]:
@@ -70,6 +79,16 @@ def GetAllProjects(savePath: str) -> list:
             continue
     return paths
 
+
+class QueueIO(StringIO):
+    def __init__(self, q):
+        super().__init__()
+        self.q = q
+
+    def write(self, data):
+        super().write(data)
+        self.q.put(data)
+
 def gui():
     ret = -1
     savePath = os.path.normpath(os.path.dirname(__file__) + "\\..\\Projects")
@@ -80,6 +99,10 @@ def gui():
     if not hasattr(static, 'projectID'):
         static.projectID = 0
         selectedNewProject = True
+        static.newStdout = StringIO()
+        
+        
+
     paths = GetAllProjects(savePath)
     selectedNewProject = False
     imgui.begin_horizontal("プロジェクト")
@@ -93,24 +116,36 @@ def gui():
         
     if selectedNewProject:
         with open(paths[static.projectID] + "\\thumbnail.jpg", "rb") as file:
-            static.previewImg = cv2.cvtColor(cv2.imdecode(np.fromstring(file.read(), np.uint8),1),cv2.COLOR_BGR2RGB)
+            static.previewImg = cv2.imdecode(np.fromstring(file.read(), np.uint8),1)
     if hasattr(static, 'previewImg'):
         immvision.image_display("##preview", static.previewImg,(320,180),selectedNewProject)
     imgui.end_horizontal()
-    if imgui.button("このプロジェクトで続く"):
-        global selectedProject 
-        selectedProject = paths[static.projectID]
-        ret = 1
+    
+    if not hasattr(static, 'downloadVideoThread') or not static.downloadVideoThread.is_alive():
+        if imgui.button("このプロジェクトで続く"):
+            global selectedProject 
+            selectedProject = paths[static.projectID]
+            ret = 1
 
+    imgui.separator_text("ダウンロード")
     if not hasattr(static, 'videoLinkToDownload'):
-        static.videoLinkToDownload = "https://www.youtube.com/watch?v=cQV0FF0zPH4"#"Set Link Here"
-    _, static.videoLinkToDownload = imgui.input_text("##YouTubeリンクをここに", static.videoLinkToDownload)
+        static.videoLinkToDownload = ""
+    
+    _, static.videoLinkToDownload = imgui.input_text_with_hint("リンク","YouTubeリンクをここに", static.videoLinkToDownload)
 
-    if imgui.button("ダウンロード"):
 
-        CreateNewProject(static.videoLinkToDownload, savePath)
+    if not hasattr(static, 'downloadVideoThread') or not static.downloadVideoThread.is_alive():
+        if sys.stdout != sys.__stdout__:
+            sys.stdout = sys.__stdout__
+            
+        if imgui.button("ダウンロード##Button"):
+            
+            static.newStdout = sys.stdout = StringIO()
+            static.downloadVideoThread = threading.Thread(target=CreateNewProject, args= [static.videoLinkToDownload,savePath])
+            static.downloadVideoThread.start()
+            
+    imgui.input_text_multiline("##stdout",static.newStdout.getvalue(),flags=imgui.InputTextFlags_.read_only,size=[-1,-1])
 
     return ret
     
 
-#https://www.youtube.com/watch?v=idZov-CjcHA

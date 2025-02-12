@@ -36,7 +36,6 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
     
     runner_params.imgui_window_params.show_menu_bar = False
     runner_params.imgui_window_params.show_status_bar = False
-    
     runner_params.imgui_window_params.default_imgui_window_type = (
         hello_imgui.DefaultImGuiWindowType.provide_full_screen_dock_space
     )
@@ -52,8 +51,8 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
     windows = [ download_window.gui, timeline_window.gui]
     
     
-    window = hello_imgui.DockableWindow()
-    window.label = "main"
+    window = hello_imgui.DockableWindow(can_be_closed_= False)
+    window.label = "##main"
     window.dock_space_name = "MainDockSpace"
     
     def win_fn() -> None:
@@ -69,7 +68,7 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
     dockable_windows.append(window)
     
     runner_params.docking_params.dockable_windows = dockable_windows
-
+    
     # the main gui is only responsible to give focus to ImGui Bundle dockable window
     @static(nb_frames=0)
     def show_gui():
