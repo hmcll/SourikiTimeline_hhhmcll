@@ -28,12 +28,17 @@ def CreateNewProject(link : str, ProjectFolderLink : str):
         setting["title"] = jsonRet["title"]
         setting["link"] = link
 
-        setting["movie_width"] = jsonRet["width"]
-        setting["movie_height"] = jsonRet["height"]
+
+        videoFile = cv2.VideoCapture(ProjectFolderLink + "\\" + title + "\\video.mp4")
         
-        setting["movie_start_time"] = 0
-        setting["movie_end_time"] = float(jsonRet["duration"])
-        setting["movie_preview_time"] = 0
+        success, Image = videoFile.read()
+        setting["FrameWidth"] = Image.shape[1]
+        setting["FrameHeight"] = Image.shape[0]
+        setting["FramePerSecond"] = videoFile.get(cv2.CAP_PROP_FPS)
+        setting["FrameCount"] =  int(videoFile.get(cv2.CAP_PROP_FRAME_COUNT))
+
+
+        
 
         setting['timeBoxx'] = 10
         setting['timeBoxy'] = 10
