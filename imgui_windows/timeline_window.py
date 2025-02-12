@@ -100,30 +100,29 @@ def LoadVideo(ref):
     videoFile.set(cv2.CAP_PROP_POS_MSEC, 0)
 
     ref.Cost_Frame = list['SkillUse']()
-    frameCount = ref.frameCount
     last_cost = 0.0
-    frame_id = 0
+    
     x,y,w,h = [ref.config['costBoxx'], ref.config['costBoxy'], ref.config['costBoxw'], ref.config['costBoxh']]
     tx,ty,tw,th = [ref.config['timeBoxx'], ref.config['timeBoxy'], ref.config['timeBoxw'], ref.config['timeBoxh']]
     
-    while frame_id < frameCount:
+    while True:
             
-        videoProgress = (frame_id / frameCount) * 100
-        success, frame = videoFile.read()
+        success, ref.rawFrameImg = videoFile.read()
         if not success:
-            frame_id+=10
-            continue
+            break
+        ref.frameID = int(videoFile.get(cv2.CAP_PROP_POS_FRAMES))
         
-        choppedImage = frame[y : y + h, x : x + w, :]
+        videoProgress = (ref.frameID / ref.frameCount) * 100
+        drawRectangles(ref)
+        choppedImage = ref.rawFrameImg[y : y + h, x : x + w, :]
         
         cost = ocr_utils.calculateCost(choppedImage)
         
         if last_cost > cost + .7 :
-            image = cv2.cvtColor(frame[ty : ty + th, tx : tx + tw, :], cv2.COLOR_BGR2GRAY)
+            image = cv2.cvtColor(ref.rawFrameImg[ty : ty + th, tx : tx + tw, :], cv2.COLOR_BGR2GRAY)
             result = timeOCR.ocr(image,cls=False)
             
             if result[0] is None:
-                frame_id += 1
                 continue
 
             time = ""
@@ -131,19 +130,17 @@ def LoadVideo(ref):
                 time+=line[1][0]
 
             if time == "":
-                frame_id += 1
                 continue
 
-            ref.Cost_Frame.append(SkillUse.FromList([cost, last_cost,frame_id,0,time]))
+            ref.Cost_Frame.append(SkillUse.FromList([cost, last_cost,ref.frameID,0,time]))
             last_cost = cost
-            frame_id += 1
             continue
         last_cost = cost
-        frame_id += 1
         continue
         
     DetectSkills(ref)
     SaveCostFrame(ref.Cost_Frame)
+    videoProgress = 100
             
 
 def drawRectangles(staticVariables):
@@ -215,7 +212,8 @@ def PlotSkill(context, data : list['SkillUse'], halfWidth = 10):
         draw_list.add_rect_filled(top, bot, 0X66666666)
         if imgui.is_mouse_released(imgui.MouseButton_.left) and imgui.get_mouse_drag_delta(imgui.MouseButton_.left).x == 0:
             global videoFile
-            LoadFrame(context,mousex,videoFile)
+            if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
+                LoadFrame(context,mousex,videoFile)
     draw_list.add_line(implot.plot_to_pixels(context.frameID, limit.y.max), implot.plot_to_pixels(context.frameID, limit.y.min), 0XFFFFFFFF)
     tooltipShown = False
     
@@ -225,15 +223,15 @@ def PlotSkill(context, data : list['SkillUse'], halfWidth = 10):
         SkillUseBoxRH = implot.plot_to_pixels(row.FrameID + halfWidth, row.FromCost)
         offsetToFrame = (row.SkillOffset+context.config['skillOffset'])/ 1000 * context.config['movie_frame_rate']
         SkillDiffChecker = implot.plot_to_pixels(int(row.FrameID  +  offsetToFrame), (row.ToCost + row.FromCost) / 2)
-        Brightness = 0XAA888888
+        Brightness = 0XAAAAAAAA
         if not tooltipShown:
             if mousex > row.FrameID - halfWidth and mousex < row.FrameID + halfWidth:
                 if mousepos.y > row.ToCost and mousepos.y < row.FromCost:
                     imgui.set_tooltip(row.ToString())
                     Brightness  = 0XFFDDDDDD
                     tooltipShown = True
-                    
-        draw_list.add_rect_filled(SkillUseBoxLB, SkillUseBoxRH, Brightness & 0XFF00FFFF)
+
+        draw_list.add_rect_filled(SkillUseBoxLB, SkillUseBoxRH, Brightness & (0XFF00FF00 if row.DetectedSkill != "" else 0XFF00FFFF))
         if SkillUseBoxRH.x > SkillDiffChecker.x:
 
             draw_list.add_line([SkillDiffChecker.x,SkillDiffChecker.y], [SkillUseBoxRH.x,SkillDiffChecker.y], Brightness & 0XFF00FF00)
@@ -259,7 +257,7 @@ def gui():
         videoFile = cv2.VideoCapture(download_window.selectedProject + "\\video.mp4")
         
         static.frameCount =  int(videoFile.get(cv2.CAP_PROP_FRAME_COUNT))
-        
+        static.config['movie_frame_rate'] = videoFile.get(cv2.CAP_PROP_FPS)
         success, static.rawFrameImg = videoFile.read()
         static.frameWidth = static.rawFrameImg.shape[1]
         static.frameHeight = static.rawFrameImg.shape[0]
@@ -300,6 +298,8 @@ def gui():
             
         if changeda or changedb or changedc:
             drawRectangles(static)
+            static.costImg = np.copy(static.rawFrameImg[static.config['costBoxy'] : static.config['costBoxy'] + static.config['costBoxh'], static.config['costBoxx']: static.config['costBoxx'] + static.config['costBoxw'],  :])
+
 
         if imgui.button("セーブ"):
             
@@ -357,4 +357,4 @@ def gui():
         pass
     imgui.text("Cost :" + static.currentCost)
     
-    return 2
+    return 1

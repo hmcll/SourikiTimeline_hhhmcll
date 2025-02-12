@@ -1,11 +1,7 @@
 
-
-from types import ModuleType
-from typing import List, Callable
 from imgui_bundle import imgui, hello_imgui, immapp, imgui_ctx, immvision
 from imgui_bundle.immapp import static
 import imgui_windows.download_window as download_window
-import imgui_windows.masking_window as masking_window
 import imgui_windows.timeline_window as timeline_window
 
 currentWindowID = 0
@@ -49,11 +45,11 @@ def make_params() -> tuple[hello_imgui.RunnerParams, immapp.AddOnsParams]:
     font_jap: imgui.ImFont | None = None
     runner_params.callbacks.load_additional_fonts = lambda: load_font(font_jap)
 
-    dockable_windows: List[hello_imgui.DockableWindow] = []
+    dockable_windows: list['hello_imgui.DockableWindow'] = []
 
 
 
-    windows = [ download_window.gui, masking_window.gui, timeline_window.gui]
+    windows = [ download_window.gui, timeline_window.gui]
     
     
     window = hello_imgui.DockableWindow()

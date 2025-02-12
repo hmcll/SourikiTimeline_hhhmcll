@@ -6,7 +6,8 @@ import json
 import cv2
 import numpy as np
 import requests
-import decord
+
+
 
 from scripts.media_utils import ydl_download, get_video_info
 
@@ -16,14 +17,13 @@ def CreateNewProject(link : str, ProjectFolderLink : str):
     title,  jsonRet = get_video_info(link)
     if title is not None:
         ydl_download(link, ProjectFolderLink + "\\" + title + "\\video.mp4")
-        firstFrame = decord.VideoReader(ProjectFolderLink + "\\" + title + "\\video.mp4", ctx=decord.cpu(0), num_threads=1)[0]
         setting = {}
         setting["title"] = jsonRet["title"]
         setting["link"] = link
 
-        setting["movie_width"] = firstFrame.shape[1]
-        setting["movie_height"] = firstFrame.shape[0]
-        setting["movie_frame_rate"] = jsonRet["fps"]
+        setting["movie_width"] = jsonRet["width"]
+        setting["movie_height"] = jsonRet["height"]
+        
         setting["movie_start_time"] = 0
         setting["movie_end_time"] = float(jsonRet["duration"])
         setting["movie_preview_time"] = 0
@@ -43,7 +43,7 @@ def CreateNewProject(link : str, ProjectFolderLink : str):
         setting['costBoxw'] = 50
         setting['costBoxh'] = 50
         setting['skillOffset'] = 500
-
+        
         response = requests.get(jsonRet["thumbnail"])
         with open(ProjectFolderLink + "\\" + title + "\\thumbnail.jpg", "wb") as file:
             file.write(response.content)
@@ -100,7 +100,7 @@ def gui():
     if imgui.button("このプロジェクトで続く"):
         global selectedProject 
         selectedProject = paths[static.projectID]
-        ret = 2
+        ret = 1
 
     if not hasattr(static, 'videoLinkToDownload'):
         static.videoLinkToDownload = "https://www.youtube.com/watch?v=cQV0FF0zPH4"#"Set Link Here"

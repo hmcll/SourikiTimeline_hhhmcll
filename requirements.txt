@@ -1,14 +1,9 @@
 paddleocr==2.9.1
 paddlepaddle
-parameterized
-pydantic
-pyperclip
 yt-dlp
 setuptools
 imgui-bundle
 opencv-python
 pyGLM
 moviepy
-matplotlib
 numpy
-decord
