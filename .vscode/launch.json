@@ -8,9 +8,9 @@
             "name": "Python Debugger",
             "type": "debugpy",
             "request": "launch",
-            "program": "Test.py",
+            "program": "launch.py",
             "console": "integratedTerminal",
-            
+            "python": "./venv/Scripts/python.exe"
         }
     ]
 }

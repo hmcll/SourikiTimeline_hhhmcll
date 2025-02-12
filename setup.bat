@@ -12,7 +12,7 @@ pip freeze
 type VERSION > .local_version
 
 if not "%skip_key_wait%"=="true" (
-  echo "All complate!!! plass any key..."
+  echo "All complete!!! press any key..."
   pause
 )
 
