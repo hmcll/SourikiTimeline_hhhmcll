@@ -19,10 +19,13 @@ selectedProject = ""
 def CreateNewProject(link : str, ProjectFolderLink : str):
     try:
         title,  jsonRet = get_video_info(link)
+        title = title.replace('\\','-')
+        title = title.replace('/','-')
     except:
         print("リンク無効")
         return
     if title is not None:
+        
         ydl_download(link, ProjectFolderLink + "\\" + title + "\\video.mp4")
         setting = {}
         setting["title"] = jsonRet["title"]
