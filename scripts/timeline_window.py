@@ -36,7 +36,7 @@ class SkillUse:
         return [self.ToCost,self.FromCost,self.FrameID,self.SkillOffset,self.TimeString,self.SkillStringRaw,self.DetectedSkill,self.Disabled,self.Meta]
     
     def ToString(self) ->str:
-        return f"スキル：{self.DetectedSkill} \n時間：{self.TimeString} \nスキル判定オフセット:{self.SkillOffset} ms\n有効:{self.Disabled}\n{self.Meta}"
+        return f"スキル：{self.DetectedSkill} \n時間：{self.TimeString} \nスキル判定オフセット:{self.SkillOffset} ms\n{"無効"if self.Disabled else "有効"}\n{self.Meta}"
 
     def FromList(data : list) -> 'SkillUse':
         ret : 'SkillUse' = SkillUse()
@@ -74,7 +74,7 @@ def DetectSkills():
     
     for row in static.Cost_Frame:
         
-        time = 1000 / static.config["movie_frame_rate"] * row.FrameID
+        time = 1000 / static.config["FramePerSecond"] * row.FrameID
         success = videoFile.set(cv2.CAP_PROP_POS_MSEC, time + row.SkillOffset + static.config['skillOffset'])
 
         static.frameID = row.FrameID
@@ -98,6 +98,8 @@ def DetectSkills():
             row.SkillStringRaw += str(line[1][0])
             
         row.DetectedSkill, similarity = CharaSkill.find_best_match(skills,row.SkillStringRaw,50)
+        if row.DetectedSkill is None:
+            row.DetectedSkill = ""
         row.Disabled = row.DetectedSkill == ''
 
 def DetectSkillOnly():
@@ -148,7 +150,7 @@ def LoadVideo():
         last_cost = cost
         continue
         
-    DetectSkills(static)
+    DetectSkills()
     SaveCostFrame(static.Cost_Frame)
             
 
@@ -192,7 +194,7 @@ def LoadData(projectPath)-> list['SkillUse']:
 
 def LoadFrame(FrameID, video):
 
-        time = 1000 / static.config["movie_frame_rate"] * FrameID
+        time = 1000 / static.config["FramePerSecond"] * FrameID
         success = videoFile.set(cv2.CAP_PROP_POS_MSEC, time)
 
         success, static.rawFrameImg = video.read()
@@ -214,7 +216,7 @@ def PlotSkill(data : list['SkillUse'], halfWidth = 10):
     draw_list.push_clip_rect(imgui.ImVec2(lb.x,ru.y),imgui.ImVec2(ru.x,lb.y))
 
     mousepos = implot.get_plot_mouse_pos()
-    mousex = min(static.frameCount, np.round(mousepos.x))
+    mousex = min(static.config['FrameCount'], np.round(mousepos.x))
     if implot.is_plot_hovered():
 
         top  = implot.plot_to_pixels(mousex - halfWidth, limit.y.max)
@@ -232,7 +234,7 @@ def PlotSkill(data : list['SkillUse'], halfWidth = 10):
 
         SkillUseBoxLB = implot.plot_to_pixels(row.FrameID - halfWidth, row.ToCost)
         SkillUseBoxRH = implot.plot_to_pixels(row.FrameID + halfWidth, row.FromCost)
-        offsetToFrame = (row.SkillOffset+static.config['skillOffset'])/ 1000 * static.config['movie_frame_rate']
+        offsetToFrame = (row.SkillOffset+static.config['skillOffset'])/ 1000 * static.config['FramePerSecond']
         SkillDiffChecker = implot.plot_to_pixels(int(row.FrameID  +  offsetToFrame), (row.ToCost + row.FromCost) / 2)
         Brightness = 0XAAAAAAAA
         if not tooltipShown:
@@ -272,11 +274,7 @@ def gui():
         static.Cost_Frame = LoadData(download_window.selectedProject)
         videoFile = cv2.VideoCapture(download_window.selectedProject + "\\video.mp4")
         
-        static.frameCount =  int(videoFile.get(cv2.CAP_PROP_FRAME_COUNT))
-        static.config['movie_frame_rate'] = videoFile.get(cv2.CAP_PROP_FPS)
         success, static.rawFrameImg = videoFile.read()
-        static.frameWidth = static.rawFrameImg.shape[1]
-        static.frameHeight = static.rawFrameImg.shape[0]
         
         static.rawFrame = np.copy(static.rawFrameImg)
         static.costImg = np.copy(static.rawFrameImg[static.config['costBoxy'] : static.config['costBoxy'] + static.config['costBoxh'], static.config['costBoxx']: static.config['costBoxx'] + static.config['costBoxw'],  :])
@@ -300,21 +298,22 @@ def gui():
 
     changeda, [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']] = sliderInt4("時間", sideBuffer, 
             [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']],
-            [static.config['movie_width'], static.config['movie_height']])
+            [static.config['FrameWidth'], static.config['FrameHeight']])
     
     changedb, [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']] = sliderInt4("スキル", sideBuffer, 
             [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']],
-            [static.config['movie_width'], static.config['movie_height']])
+            [static.config['FrameWidth'], static.config['FrameHeight']])
     
     changedc, [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']] = sliderInt4("コスト", sideBuffer, 
             [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']],
-            [static.config['movie_width'], static.config['movie_height']])
+            [static.config['FrameWidth'], static.config['FrameHeight']])
         
     if changeda or changedb or changedc:
+        static.dataFrameID = -1
         drawRectangles()
 
 
-    if imgui.button("ボックス範囲を保存保存"):
+    if imgui.button("ボックス範囲を保存"):
         
         with open(download_window.selectedProject + "\\setting.json", "w",encoding="utf-8") as file:
             json.dump(static.config,file, ensure_ascii=False, indent=4)
@@ -400,7 +399,7 @@ def gui():
                 for row  in static.Cost_Frame:
                     if not row.Disabled:
                         
-                        file.write(str(row.FromCost) + " " + row.DetectedSkill + " " + row.TimeString)
+                        file.write(str(row.FromCost) + " " + row.DetectedSkill + " " + row.TimeString + "\n")
     imgui.end_child()
     imgui.end_child()
 
@@ -410,8 +409,8 @@ def gui():
         implot.setup_axes("frame", "cost", implot.AxisFlags_.range_fit,implot.AxisFlags_.lock)
 
         implot.setup_axis_limits(implot.ImAxis_.y1, 0, 10)
-        implot.setup_axis_limits(implot.ImAxis_.x1, 0, static.frameCount)
-        implot.setup_axis_limits_constraints(implot.ImAxis_.x1, 0, static.frameCount)
+        implot.setup_axis_limits(implot.ImAxis_.x1, 0, static.config['FrameCount'])
+        implot.setup_axis_limits_constraints(implot.ImAxis_.x1, 0, static.config['FrameCount'])
         PlotSkill( static.Cost_Frame)
         implot.end_plot()
     if hasattr(static, 'SelectedCostFrame') and static.SelectedCostFrame >= 0:
