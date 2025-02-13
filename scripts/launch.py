@@ -1,8 +1,8 @@
 
 from imgui_bundle import imgui, hello_imgui, immapp, imgui_ctx, immvision
 from imgui_bundle.immapp import static
-import imgui_windows.download_window as download_window
-import imgui_windows.timeline_window as timeline_window
+import download_window
+import timeline_window
 
 currentWindowID = 0
 

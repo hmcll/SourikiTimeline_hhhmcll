@@ -1,10 +1,6 @@
 import os
 import json
 
-from moviepy import VideoFileClip
-from moviepy.config import FFMPEG_BINARY
-
-from PIL import Image
 from yt_dlp import YoutubeDL
 
 
@@ -28,7 +24,6 @@ def ydl_download(url, output_path):
     option = {
         'outtmpl': output_path,
         'format': "bestvideo[ext=mp4]/best",
-        'ffmpeg_location': FFMPEG_BINARY,
     }
     with YoutubeDL(option) as ydl:
         result = ydl.download([url])

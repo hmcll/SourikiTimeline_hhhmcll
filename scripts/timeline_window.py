@@ -5,14 +5,13 @@ import os
 from imgui_bundle import implot
 import cv2
 import numpy as np
-import imgui_windows.download_window as download_window
+import download_window
 
 import threading
-import imgui_windows.ocr_utils as ocr_utils
+import ocr_utils
 import csv
-import importlib
 import json
-from scripts.chara_skill import CharaSkill
+from chara_skill import CharaSkill
 from paddleocr import PaddleOCR
 
 skillOCR = PaddleOCR(use_angle_cls=False, lang='japan', show_log=False)

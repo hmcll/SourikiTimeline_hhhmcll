@@ -1,19 +1,12 @@
-cd %~dp0
+cd ./Python
+powershell Expand-Archive -Force ./python-3.12.9-embed-amd64.zip ./Runtime
+copy "requirements.txt" "./Runtime/"
+copy "get-pip.py" "./Runtime/"
+cd ./Runtime
+"./python.exe" get-pip.py
+ECHO Lib/site-packages >> python312._pth
+"./Scripts/pip.exe" install --upgrade -r requirements.txt
+cd ..
+powershell Expand-Archive -Force ./imgui_bundle.zip ./Runtime/Lib/site-packages
 
-set skip_key_wait=%1
-
-python.exe -m venv venv
-call venv\Scripts\activate.bat
-
-pip install --upgrade -r requirements.txt
-
-pip freeze
-
-type VERSION > .local_version
-
-if not "%skip_key_wait%"=="true" (
-  echo "All complete!!! press any key..."
-  pause
-)
-
-deactivate
+pause
