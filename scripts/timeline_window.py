@@ -1,18 +1,17 @@
-from imgui_bundle import imgui
+from imgui_bundle import imgui, immvision, implot
 from imgui_bundle.immapp import static
-from imgui_bundle import immvision
+
 import os
-from imgui_bundle import implot
 import cv2
 import numpy as np
-import download_window
-
 import threading
 import ocr_utils
 import csv
 import json
-from chara_skill import CharaSkill
 from paddleocr import PaddleOCR
+from chara_skill import CharaSkill
+import download_window
+import subprocess
 
 skillOCR = PaddleOCR(use_angle_cls=False, lang='japan', show_log=False)
 timeOCR = PaddleOCR(use_angle_cls=False, lang='en', show_log=False)
@@ -157,13 +156,13 @@ def LoadVideo():
         
     DetectSkills()
     SaveCostFrame(static.Cost_Frame)
-            
+
 
 def drawRectangles():
-    static.rawFrame = np.copy(static.rawFrameImg)
-    cv2.rectangle(static.rawFrame, (static.config['timeBoxx'], static.config['timeBoxy']),(static.config['timeBoxx'] + static.config['timeBoxw'], static.config['timeBoxy'] + static.config['timeBoxh']),(0,0,255),2)
-    cv2.rectangle(static.rawFrame, (static.config['skillBoxx'], static.config['skillBoxy']),(static.config['skillBoxx'] + static.config['skillBoxw'], static.config['skillBoxy'] + static.config['skillBoxh']),(0,255,0),2)
-    cv2.rectangle(static.rawFrame, (static.config['costBoxx'], static.config['costBoxy']),(static.config['costBoxx'] + static.config['costBoxw'], static.config['costBoxy'] + static.config['costBoxh']),(0,255,255),2)
+    static.frameImage = np.copy(static.rawFrameImg)
+    cv2.rectangle(static.frameImage, (static.config['timeBoxx'], static.config['timeBoxy']),(static.config['timeBoxx'] + static.config['timeBoxw'], static.config['timeBoxy'] + static.config['timeBoxh']),(0,0,255),2)
+    cv2.rectangle(static.frameImage, (static.config['skillBoxx'], static.config['skillBoxy']),(static.config['skillBoxx'] + static.config['skillBoxw'], static.config['skillBoxy'] + static.config['skillBoxh']),(0,255,0),2)
+    cv2.rectangle(static.frameImage, (static.config['costBoxx'], static.config['costBoxy']),(static.config['costBoxx'] + static.config['costBoxw'], static.config['costBoxy'] + static.config['costBoxh']),(0,255,255),2)
 
 def sliderInt4(tag, itemWidth, itemValues, frameValues):
     imgui.separator_text(tag)
@@ -204,7 +203,7 @@ def LoadFrame(FrameID, video):
 
         success, static.rawFrameImg = video.read()
 
-        static.rawFrame = np.copy(static.rawFrameImg)
+        static.frameImage = np.copy(static.rawFrameImg)
         static.frameID = FrameID
         drawRectangles()
 
@@ -266,50 +265,20 @@ def PlotSkill(data : list['SkillUse'], halfWidth = 10):
 
     draw_list.pop_clip_rect()
 
-def gui():
-    
-    global videoFile
-    
-    windowWidth = imgui.get_content_region_avail().x
+def BoxSizePanel(panelWidth, panelHeight):
 
-    if videoFile is None:
-            
-        with open(download_window.selectedProject + "\\setting.json", "r",encoding="utf-8") as file:
-            static.config = json.load(file)
-        static.Cost_Frame = LoadData(download_window.selectedProject)
-        videoFile = cv2.VideoCapture(download_window.selectedProject + "\\video.mp4")
-        
-        success, static.rawFrameImg = videoFile.read()
-        
-        static.rawFrame = np.copy(static.rawFrameImg)
-        static.costImg = np.copy(static.rawFrameImg[static.config['costBoxy'] : static.config['costBoxy'] + static.config['costBoxh'], static.config['costBoxx']: static.config['costBoxx'] + static.config['costBoxw'],  :])
-
-        static.currentCost = str( ocr_utils.calculateCost(static.costImg))
-        static.frameID = 0
-        static.dataFrameID = -1
-        drawRectangles()
+    imgui.begin_child("##DetectionBoxAdjustments",[-1,panelHeight])
 
 
-
-    windowWidth = imgui.get_content_region_avail().x
-    videoViewWidth = int(windowWidth / 5 * 3)
-    videoHeight = int(videoViewWidth / 16 * 9)
-    sideBuffer = (windowWidth-videoViewWidth)/2
-    
-    imgui.begin_child("##LeftWindow",[sideBuffer-10,videoHeight])
-    imgui.separator_text("ボックス調整")
-    imgui.begin_child("##DetectionBoxAdjustments",[-1,videoHeight/2 - 50])
-
-
-    changeda, [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']] = sliderInt4("時間", sideBuffer, 
+    changeda, [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']] = sliderInt4("時間", panelWidth, 
             [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']],
             [static.config['FrameWidth'], static.config['FrameHeight']])
     
-    changedb, [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']] = sliderInt4("スキル", sideBuffer, 
+    changedb, [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']] = sliderInt4("スキル", panelWidth, 
             [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']],
             [static.config['FrameWidth'], static.config['FrameHeight']])
     
-    changedc, [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']] = sliderInt4("コスト", sideBuffer, 
+    changedc, [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']] = sliderInt4("コスト", panelWidth, 
             [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']],
             [static.config['FrameWidth'], static.config['FrameHeight']])
         
@@ -325,9 +294,9 @@ def gui():
     
     imgui.end_child()
 
-    imgui.separator_text("動画識別コントロールパネル")
+def AnalyzationControlPanel(panelHeight):
 
-    imgui.begin_child("##VideoControlPanel",[-1,videoHeight/2 - 50],window_flags= imgui.WindowFlags_.no_scrollbar)
+    imgui.begin_child("##VideoControlPanel",[-1,panelHeight],window_flags= imgui.WindowFlags_.no_scrollbar)
     imgui.text("スキル判定オフセット")
     changed, static.config['skillOffset']  = imgui.input_int("##SkillOffsetInput",static.config['skillOffset']) 
         
@@ -353,22 +322,20 @@ def gui():
         imgui.same_line()
         imgui.color_button("LoadVideoRunningIndicator", [255,255,0,255] ,imgui.ColorEditFlags_.no_tooltip | imgui.ColorEditFlags_.no_inputs)
     
+    if static.showGraph:
+        if imgui.button("テーブル表示"):
+            static.showGraph = False
+
+    else:
+        if imgui.button("グラフ表示"):
+            static.showGraph = True
+
 
     imgui.end_child()
 
-    imgui.end_child()
-
-    imgui.same_line()
+def BoxVisualizationPanel(panelWidth, panelHeight):
     
-    immvision.image_display("##frame", static.rawFrame,(videoViewWidth, videoHeight), refresh_image = True)
-
-    imgui.same_line()
-    
-
-    imgui.begin_child("##RightWindow",[sideBuffer -20,videoHeight],window_flags= imgui.WindowFlags_.no_scrollbar)
-
-    imgui.separator_text("コスト識別データ")
-    imgui.begin_child("##コスト識別データ",[ -1,videoHeight/2 - 50])
+    imgui.begin_child("##コスト識別データ",[ -1,panelHeight])
     
     
     if static.dataFrameID != static.frameID:
@@ -382,7 +349,7 @@ def gui():
         static.dataFrameID = static.frameID
         static.currentCost = str( ocr_utils.calculateCost(static.costImg))
         
-    displaySize = (int(sideBuffer -20), int(sideBuffer/20 - 1))
+    displaySize = (int(panelWidth -20), int(panelWidth/20 - 1))
     imgui.text("コスト")
     immvision.image_display("##costImage", static.costImg, displaySize, refresh_image = True)
     imgui.text("識別用")
@@ -393,32 +360,98 @@ def gui():
     imgui.text("Cost :" + static.currentCost)
 
     imgui.end_child()
+
+def gui():
+    
+    ret = 1
+    global videoFile
+    
+    windowWidth = imgui.get_content_region_avail().x
+
+    if videoFile is None:
+            
+        with open(download_window.selectedProject + "\\setting.json", "r",encoding="utf-8") as file:
+            static.config = json.load(file)
+        static.Cost_Frame = LoadData(download_window.selectedProject)
+        videoFile = cv2.VideoCapture(download_window.selectedProject + "\\video.mp4")
         
+        success, static.rawFrameImg = videoFile.read()
+        
+        static.frameImage = np.copy(static.rawFrameImg)
+        
+        static.frameID = 0
+        static.dataFrameID = -1
+        static.showGraph = True
+        
+
+
+
+    windowWidth = imgui.get_content_region_avail().x
+    videoViewWidth = int(windowWidth / 5 * 3)
+    videoHeight = int(videoViewWidth / 16 * 9)
+    sideBuffer = (windowWidth-videoViewWidth)/2
+    #left panel
+    imgui.begin_child("##LeftPanel",[sideBuffer-10,videoHeight])
+
+    imgui.separator_text("ボックス調整")
+    BoxSizePanel(sideBuffer, videoHeight/2 - 50)
+    imgui.separator_text("動画識別コントロールパネル")
+    AnalyzationControlPanel(videoHeight/2 - 50)
+
+    imgui.end_child()
+
+    imgui.same_line()
+    
+    immvision.image_display("##frame", static.frameImage,(videoViewWidth, videoHeight), refresh_image = True)
+
+    imgui.same_line()
+    
+    imgui.begin_child("##RightPanel",[sideBuffer -20,videoHeight],window_flags= imgui.WindowFlags_.no_scrollbar)
+
+
+    imgui.separator_text("コスト識別データ")
+    BoxVisualizationPanel(sideBuffer, videoHeight/2 - 50)
+    
+    imgui.separator_text("ジェネラル")
     imgui.begin_child("##OutputWindow",[-1,videoHeight/2 - 50])
     
     if hasattr(static, 'Cost_Frame') and static.Cost_Frame is not None and len(static.Cost_Frame) > 0:
-        if imgui.button("出力"):
+        if imgui.button("タイムライン出力"):
             
             with open(download_window.selectedProject + '\\PartialTimeline.txt', 'w', newline='', encoding='utf-8') as file:
                 
                 for row  in static.Cost_Frame:
                     if not row.Disabled:
-                        
                         file.write(str(row.FromCost) + " " + row.DetectedSkill + " " + row.TimeString + "\n")
+            subprocess.Popen("notepad.exe " + download_window.selectedProject + '\\PartialTimeline.txt')
+
+    if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
+        if imgui.button("プロジェクト選択へ戻る"):
+            videoFile = None
+            ret = 0
     imgui.end_child()
+
     imgui.end_child()
 
 
-    if implot.begin_plot("##cost plot",size=[-1,-1]):
+    imgui.begin_child("##DataWindow",size=[-1,-1])
+    if static.showGraph:
+        if implot.begin_plot("##cost plot",size=[-1,-1]):
+            
+            implot.setup_axes("frame", "cost", implot.AxisFlags_.range_fit,implot.AxisFlags_.lock)
+
+            implot.setup_axis_limits(implot.ImAxis_.y1, 0, 10)
+            implot.setup_axis_limits(implot.ImAxis_.x1, 0, static.config['FrameCount'])
+            implot.setup_axis_limits_constraints(implot.ImAxis_.x1, 0, static.config['FrameCount'])
+            PlotSkill( static.Cost_Frame)
+            implot.end_plot()
+            
+    else:
+        imgui.begin_table("##cost table",columns = 1)
+        for row in static.Cost_Frame:
+            imgui.table_next_row()
+            imgui.text(row.DetectedSkill)
+        imgui.end_table()
         
-        implot.setup_axes("frame", "cost", implot.AxisFlags_.range_fit,implot.AxisFlags_.lock)
-
-        implot.setup_axis_limits(implot.ImAxis_.y1, 0, 10)
-        implot.setup_axis_limits(implot.ImAxis_.x1, 0, static.config['FrameCount'])
-        implot.setup_axis_limits_constraints(implot.ImAxis_.x1, 0, static.config['FrameCount'])
-        PlotSkill( static.Cost_Frame)
-        implot.end_plot()
-    if hasattr(static, 'SelectedCostFrame') and static.SelectedCostFrame >= 0:
-        pass
-    
-    return 1
+    imgui.end_child()
+    return ret

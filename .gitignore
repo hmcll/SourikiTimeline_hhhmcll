@@ -1,16 +1,14 @@
 
 .DS_Store
+.github
+.vscode
+
 __pycache__
-venv
-flagged
-config.json
-resources/timeline_config.json
-tmp
-checkpoints
-.local_version
-favicon.ico
+Python
+
+
 Projects
 
-Python
-.vscode
 Timeline_Generation.ini
+Dear_ImGui_Bundle_interactive_manual.ini
+Dear_ImGui_Bundle_interactive_manual.node_editor.json
