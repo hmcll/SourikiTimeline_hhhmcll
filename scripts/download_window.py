@@ -12,7 +12,7 @@ import sys
 import threading
 
 
-from scripts.media_utils import ydl_download, get_video_info
+from media_utils import ydl_download, get_video_info
 
 selectedProject = ""
 
@@ -30,8 +30,7 @@ def CreateNewProject(link : str, ProjectFolderLink : str):
         setting = {}
         setting["title"] = jsonRet["title"]
         setting["link"] = link
-
-
+        
         videoFile = cv2.VideoCapture(ProjectFolderLink + "\\" + title + "\\video.mp4")
         
         success, Image = videoFile.read()
@@ -39,10 +38,7 @@ def CreateNewProject(link : str, ProjectFolderLink : str):
         setting["FrameHeight"] = Image.shape[0]
         setting["FramePerSecond"] = videoFile.get(cv2.CAP_PROP_FPS)
         setting["FrameCount"] =  int(videoFile.get(cv2.CAP_PROP_FRAME_COUNT))
-
-
         
-
         setting['timeBoxx'] = 10
         setting['timeBoxy'] = 10
         setting['timeBoxw'] = 50

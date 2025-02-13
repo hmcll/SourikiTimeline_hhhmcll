@@ -36,7 +36,11 @@ class SkillUse:
         return [self.ToCost,self.FromCost,self.FrameID,self.SkillOffset,self.TimeString,self.SkillStringRaw,self.DetectedSkill,self.Disabled,self.Meta]
     
     def ToString(self) ->str:
-        return f"スキル：{self.DetectedSkill} \n時間：{self.TimeString} \nスキル判定オフセット:{self.SkillOffset} ms\n{"無効"if self.Disabled else "有効"}\n{self.Meta}"
+        if self.Disabled:
+            disabledString = "無効"
+        else: 
+            disabledString = "有効"
+        return f"スキル：{self.DetectedSkill} \n時間：{self.TimeString} \nスキル判定オフセット:{self.SkillOffset} ms\n{disabledString}\n{self.Meta}"
 
     def FromList(data : list) -> 'SkillUse':
         ret : 'SkillUse' = SkillUse()
@@ -120,9 +124,10 @@ def LoadVideo():
     
     while True:
             
-        success, static.rawFrameImg = videoFile.read()
+        success, image = videoFile.read()
         if not success:
             break
+        static.rawFrameImg = image
         static.frameID = int(videoFile.get(cv2.CAP_PROP_POS_FRAMES))
         
         drawRectangles()
