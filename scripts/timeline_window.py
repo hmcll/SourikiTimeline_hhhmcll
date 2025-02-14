@@ -270,15 +270,15 @@ def BoxSizePanel(panelWidth, panelHeight):
     imgui.begin_child("##DetectionBoxAdjustments",[-1,panelHeight])
 
 
-    changeda, [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']] = sliderInt4("時間", panelWidth, 
+    changeda, [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']] = sliderInt4("時間", panelWidth - 50, 
             [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']],
             [static.config['FrameWidth'], static.config['FrameHeight']])
     
-    changedb, [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']] = sliderInt4("スキル", panelWidth, 
+    changedb, [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']] = sliderInt4("スキル", panelWidth - 50, 
             [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']],
             [static.config['FrameWidth'], static.config['FrameHeight']])
     
-    changedc, [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']] = sliderInt4("コスト", panelWidth, 
+    changedc, [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']] = sliderInt4("コスト", panelWidth - 50, 
             [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']],
             [static.config['FrameWidth'], static.config['FrameHeight']])
         
@@ -383,11 +383,9 @@ def gui():
         static.dataFrameID = -1
         static.showGraph = True
         
-
-
-
+        
     windowWidth = imgui.get_content_region_avail().x
-    videoViewWidth = int(windowWidth / 5 * 3)
+    videoViewWidth = int(windowWidth / 2)
     videoHeight = int(videoViewWidth / 16 * 9)
     sideBuffer = (windowWidth-videoViewWidth)/2
     #left panel
@@ -422,7 +420,7 @@ def gui():
                 
                 for row  in static.Cost_Frame:
                     if not row.Disabled:
-                        file.write(str(row.FromCost) + " " + row.DetectedSkill + " " + row.TimeString + "\n")
+                        file.write(str(row.FromCost) + "\t" + row.DetectedSkill + "\t" + row.TimeString + "\t" + row.Meta + "\n" )
             subprocess.Popen("notepad.exe " + download_window.selectedProject + '\\PartialTimeline.txt')
 
     if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
@@ -447,11 +445,60 @@ def gui():
             implot.end_plot()
             
     else:
-        imgui.begin_table("##cost table",columns = 1)
-        for row in static.Cost_Frame:
-            imgui.table_next_row()
-            imgui.text(row.DetectedSkill)
-        imgui.end_table()
+        imgui.progress_bar(static.frameID/ static.config['FrameCount'],overlay="フレーム:" + str(static.frameID))
+        tableFlags =  imgui.TableFlags_.row_bg | imgui.TableFlags_.borders | imgui.TableFlags_.highlight_hovered_column | imgui.TableFlags_.scroll_y | imgui.TableFlags_.sizing_fixed_fit
+        if imgui.begin_table("##cost table",columns = 9,flags=tableFlags):
+            imgui.table_setup_scroll_freeze(0,1)
+            imgui.table_setup_column("無効化")
+            imgui.table_setup_column("コスト", flags=imgui.TableColumnFlags_.width_stretch )
+            imgui.table_setup_column("時間", flags=imgui.TableColumnFlags_.width_stretch )
+            
+            imgui.table_setup_column("生徒", flags=imgui.TableColumnFlags_.width_stretch )
+            imgui.table_setup_column("スキル判定オフセット(ms)", flags=imgui.TableColumnFlags_.width_stretch )
+            imgui.table_setup_column("識別したスキル名", flags=imgui.TableColumnFlags_.width_stretch )
+
+            imgui.table_setup_column("メモ", flags=imgui.TableColumnFlags_.width_stretch )
+            imgui.table_setup_column("コストフレーム")
+            imgui.table_setup_column("スキルフレーム")
+            imgui.table_headers_row()
+
+            for rowID in range(len(static.Cost_Frame)):
+                row = static.Cost_Frame[rowID]
+                imgui.table_next_row()
+                imgui.table_next_column()
+                changed1, static.Cost_Frame[rowID].Disabled = imgui.checkbox("##Disabled" + str(rowID),row.Disabled)
+                imgui.table_next_column()
+                changed3, static.Cost_Frame[rowID].FromCost = imgui.input_float("##FromCost" + str(rowID),row.FromCost,0.1,1.0,'%.1f',imgui.InputTextFlags_.auto_select_all)
+                 
+                imgui.table_next_column()
+                imgui.text(row.TimeString)
+                 
+                imgui.table_next_column()
+                imgui.text(row.SkillStringRaw)
+
+                imgui.table_next_column()
+                changed4, static.Cost_Frame[rowID].SkillOffset = imgui.input_int("##SkillOffset" + str(rowID),row.SkillOffset,1,10,imgui.InputTextFlags_.auto_select_all)
+                
+                
+                imgui.table_next_column()
+                changed2, static.Cost_Frame[rowID].DetectedSkill = imgui.input_text("##DetectedSkill" + str(rowID),row.DetectedSkill,imgui.InputTextFlags_.no_horizontal_scroll|imgui.InputTextFlags_.enter_returns_true|imgui.InputTextFlags_.auto_select_all)
+                    
+                imgui.table_next_column()
+                changed5, static.Cost_Frame[rowID].Meta = imgui.input_text("##Meta" + str(rowID),row.Meta)
+
+
+                if changed1 or changed2 or changed3 or changed4 or changed5:
+                    SaveCostFrame(static.Cost_Frame)
+
+                imgui.table_next_column()
+                if imgui.button("コストフレーム##" + str(rowID)):
+                    LoadFrame(row.FrameID,videoFile)
+                imgui.table_next_column()
+                if imgui.button("スキルフレーム##" + str(rowID)):
+                    LoadFrame(row.FrameID + 0.001*(row.SkillOffset + static.config['skillOffset']) *static.config["FramePerSecond"], videoFile )
+                
+                    
+            imgui.end_table()
         
     imgui.end_child()
     return ret
