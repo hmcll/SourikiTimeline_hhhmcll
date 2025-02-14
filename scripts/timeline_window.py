@@ -285,10 +285,6 @@ def BoxSizePanel(panelWidth, panelHeight):
     if changeda or changedb or changedc:
         static.dataFrameID = -1
         drawRectangles()
-
-
-    if imgui.button("ボックス範囲を保存"):
-        
         with open(download_window.selectedProject + "\\setting.json", "w",encoding="utf-8") as file:
             json.dump(static.config,file, ensure_ascii=False, indent=4)
     
@@ -348,8 +344,15 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
         static.cosVis2min = cv2.resize(min,(200,20))
         static.dataFrameID = static.frameID
         static.currentCost = str( ocr_utils.calculateCost(static.costImg))
+        static.TimeImg = np.copy(static.rawFrameImg[static.config['timeBoxy'] : static.config['timeBoxy'] + static.config['timeBoxh'], static.config['timeBoxx']: static.config['timeBoxx'] + static.config['timeBoxw'],  :])
+        static.SkillImg = np.copy(static.rawFrameImg[static.config['skillBoxy'] : static.config['skillBoxy'] + static.config['skillBoxh'], static.config['skillBoxx']: static.config['skillBoxx'] + static.config['skillBoxw'],  :])
+
         
-    displaySize = (int(panelWidth -20), int(panelWidth/20 - 1))
+    displaySize = (int(panelWidth -40), int(panelWidth/20 - 2))
+    imgui.text("タイム")
+    immvision.image_display("##TimeImg", static.TimeImg, displaySize, refresh_image = True)
+    imgui.text("スキル")
+    immvision.image_display("##SkillImg", static.SkillImg, displaySize, refresh_image = True)
     imgui.text("コスト")
     immvision.image_display("##costImage", static.costImg, displaySize, refresh_image = True)
     imgui.text("識別用")
@@ -378,7 +381,7 @@ def gui():
         success, static.rawFrameImg = videoFile.read()
         
         static.frameImage = np.copy(static.rawFrameImg)
-        
+        drawRectangles()
         static.frameID = 0
         static.dataFrameID = -1
         static.showGraph = True
@@ -408,10 +411,10 @@ def gui():
 
 
     imgui.separator_text("コスト識別データ")
-    BoxVisualizationPanel(sideBuffer, videoHeight/2 - 50)
+    BoxVisualizationPanel(sideBuffer, videoHeight/3 * 2 - 50)
     
     imgui.separator_text("ジェネラル")
-    imgui.begin_child("##OutputWindow",[-1,videoHeight/2 - 50])
+    imgui.begin_child("##OutputWindow",[-1,videoHeight/3 - 50])
     
     if hasattr(static, 'Cost_Frame') and static.Cost_Frame is not None and len(static.Cost_Frame) > 0:
         if imgui.button("タイムライン出力"):
