@@ -38,6 +38,8 @@ def CreateNewProject(link : str, ProjectFolderLink : str):
         setting["FrameHeight"] = Image.shape[0]
         setting["FramePerSecond"] = videoFile.get(cv2.CAP_PROP_FPS)
         setting["FrameCount"] =  int(videoFile.get(cv2.CAP_PROP_FRAME_COUNT))
+        setting["FrameStart"] = 0 
+        setting["FrameEnd"] =  setting["FrameCount"]
         
         setting['timeBoxx'] = 10
         setting['timeBoxy'] = 10

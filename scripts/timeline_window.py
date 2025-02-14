@@ -113,7 +113,7 @@ def LoadVideo():
     
     global videoFile
     
-    videoFile.set(cv2.CAP_PROP_POS_MSEC, 0)
+    videoFile.set(cv2.CAP_PROP_POS_MSEC, 1000 * static.config["FrameStart"]/ static.config["FramePerSecond"])
 
     static.Cost_Frame = list['SkillUse']()
     last_cost = 0.0
@@ -126,10 +126,12 @@ def LoadVideo():
         success, image = videoFile.read()
         if not success:
             break
-        static.rawFrameImg = image
         static.frameID = int(videoFile.get(cv2.CAP_PROP_POS_FRAMES))
         
+        static.rawFrameImg = image
         drawRectangles()
+        if static.frameID >= static.config["FrameEnd"]:
+            break
         choppedImage = static.rawFrameImg[y : y + h, x : x + w, :]
         
         cost = ocr_utils.calculateCost(choppedImage)
@@ -202,8 +204,7 @@ def LoadFrame(FrameID, video):
         success = videoFile.set(cv2.CAP_PROP_POS_MSEC, time)
 
         success, static.rawFrameImg = video.read()
-
-        static.frameImage = np.copy(static.rawFrameImg)
+        
         static.frameID = FrameID
         drawRectangles()
 
@@ -221,17 +222,25 @@ def PlotSkill(data : list['SkillUse'], halfWidth = 10):
 
     mousepos = implot.get_plot_mouse_pos()
     mousex = min(static.config['FrameCount'], np.round(mousepos.x))
+    rangeBoxLU = implot.plot_to_pixels(static.config["FrameStart"], limit.y.max)
+    rangeBoxRD = implot.plot_to_pixels(static.config["FrameEnd"], limit.y.min)
+
+    draw_list.add_rect_filled(rangeBoxLU, rangeBoxRD, 0X11FFFFFF)
     if implot.is_plot_hovered():
 
         top  = implot.plot_to_pixels(mousex - halfWidth, limit.y.max)
         bot = implot.plot_to_pixels(mousex + halfWidth, limit.y.min)
         
-        draw_list.add_rect_filled(top, bot, 0X66666666)
+        draw_list.add_rect_filled(top, bot, 0X66FFFFFF)
         if imgui.is_mouse_released(imgui.MouseButton_.left) and imgui.get_mouse_drag_delta(imgui.MouseButton_.left).x == 0:
             global videoFile
             if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
                 LoadFrame(mousex,videoFile)
+
     draw_list.add_line(implot.plot_to_pixels(static.frameID, limit.y.max), implot.plot_to_pixels(static.frameID, limit.y.min), 0XFFFFFFFF)
+    draw_list.add_line([rangeBoxLU.x,rangeBoxLU.y],[rangeBoxLU.x,rangeBoxRD.y], 0XFF00FF00)
+    draw_list.add_line([rangeBoxRD.x,rangeBoxLU.y],[rangeBoxRD.x,rangeBoxRD.y], 0XFF0000FF)
+    
     tooltipShown = False
     
     for row in data:
@@ -269,6 +278,7 @@ def BoxSizePanel(panelWidth, panelHeight):
 
     imgui.begin_child("##DetectionBoxAdjustments",[-1,panelHeight])
 
+    imgui.separator_text("ボックス調整")
 
     changeda, [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']] = sliderInt4("時間", panelWidth - 50, 
             [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']],
@@ -293,7 +303,22 @@ def BoxSizePanel(panelWidth, panelHeight):
 def AnalyzationControlPanel(panelHeight):
 
     imgui.begin_child("##VideoControlPanel",[-1,panelHeight],window_flags= imgui.WindowFlags_.no_scrollbar)
-    imgui.text("スキル判定オフセット")
+    imgui.separator_text("動画識別コントロールパネル")
+    if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
+        imgui.push_style_color(imgui.Col_.button,0XFF007700)
+        imgui.push_style_color(imgui.Col_.button_active,0XFF009900)
+        imgui.push_style_color(imgui.Col_.button_hovered,0XFF003300)
+        if imgui.button("スタートフレームセット"):
+            static.config["FrameStart"] = static.frameID
+        imgui.pop_style_color(3)
+        imgui.same_line(spacing= 50)
+        imgui.push_style_color(imgui.Col_.button,0XFF000077)
+        imgui.push_style_color(imgui.Col_.button_active,0XFF000099)
+        imgui.push_style_color(imgui.Col_.button_hovered,0XFF000033)
+        if imgui.button("エンドフレームセット"):
+            static.config["FrameEnd"] = static.frameID
+        imgui.pop_style_color(3)
+    imgui.text("全体スキル判定オフセット")
     changed, static.config['skillOffset']  = imgui.input_int("##SkillOffsetInput",static.config['skillOffset']) 
         
     if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
@@ -378,11 +403,9 @@ def gui():
         static.Cost_Frame = LoadData(download_window.selectedProject)
         videoFile = cv2.VideoCapture(download_window.selectedProject + "\\video.mp4")
         
-        success, static.rawFrameImg = videoFile.read()
         
-        static.frameImage = np.copy(static.rawFrameImg)
-        drawRectangles()
-        static.frameID = 0
+        LoadFrame(int(static.config["FrameStart"]),videoFile)
+        
         static.dataFrameID = -1
         static.showGraph = True
         
@@ -394,10 +417,8 @@ def gui():
     #left panel
     imgui.begin_child("##LeftPanel",[sideBuffer-10,videoHeight])
 
-    imgui.separator_text("ボックス調整")
-    BoxSizePanel(sideBuffer, videoHeight/2 - 50)
-    imgui.separator_text("動画識別コントロールパネル")
-    AnalyzationControlPanel(videoHeight/2 - 50)
+    BoxSizePanel(sideBuffer, videoHeight/2 - 25)
+    AnalyzationControlPanel(videoHeight/2)
 
     imgui.end_child()
 
@@ -448,7 +469,7 @@ def gui():
             implot.end_plot()
             
     else:
-        imgui.progress_bar(static.frameID/ static.config['FrameCount'],overlay="フレーム:" + str(static.frameID))
+        imgui.progress_bar(static.frameID/ static.config['FrameCount'],overlay="フレーム:" + str(int(static.frameID)))
         tableFlags =  imgui.TableFlags_.row_bg | imgui.TableFlags_.borders | imgui.TableFlags_.highlight_hovered_column | imgui.TableFlags_.scroll_y | imgui.TableFlags_.sizing_fixed_fit
         if imgui.begin_table("##cost table",columns = 9,flags=tableFlags):
             imgui.table_setup_scroll_freeze(0,1)
