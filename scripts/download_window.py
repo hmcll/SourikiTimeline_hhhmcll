@@ -27,36 +27,26 @@ def CreateNewProject(link : str, ProjectFolderLink : str):
     if title is not None:
         
         ydl_download(link, ProjectFolderLink + "\\" + title + "\\video.mp4")
-        setting = {}
-        setting["title"] = jsonRet["title"]
-        setting["link"] = link
         
-        videoFile = cv2.VideoCapture(ProjectFolderLink + "\\" + title + "\\video.mp4")
         
-        success, Image = videoFile.read()
-        setting["FrameWidth"] = Image.shape[1]
-        setting["FrameHeight"] = Image.shape[0]
-        setting["FramePerSecond"] = videoFile.get(cv2.CAP_PROP_FPS)
-        setting["FrameCount"] =  int(videoFile.get(cv2.CAP_PROP_FRAME_COUNT))
-        setting["FrameStart"] = 0 
-        setting["FrameEnd"] =  setting["FrameCount"]
-        
-        setting['timeBoxx'] = 10
-        setting['timeBoxy'] = 10
-        setting['timeBoxw'] = 50
-        setting['timeBoxh'] = 50
+        with open("resources\\template.json", "r",encoding="utf-8") as file:
+            setting = json.load(file)
 
-        setting['skillBoxx'] = 10
-        setting['skillBoxy'] = 10
-        setting['skillBoxw'] = 50
-        setting['skillBoxh'] = 50
-
-        setting['costBoxx'] = 10
-        setting['costBoxy'] = 10
-        setting['costBoxw'] = 50
-        setting['costBoxh'] = 50
-        setting['skillOffset'] = 500
-        
+            setting["title"] = jsonRet["title"]
+            setting["link"] = link
+            
+            videoFile = cv2.VideoCapture(ProjectFolderLink + "\\" + title + "\\video.mp4")
+            
+            success, Image = videoFile.read()
+            setting["FrameWidth"] = Image.shape[1]
+            setting["FrameHeight"] = Image.shape[0]
+            setting["FramePerSecond"] = videoFile.get(cv2.CAP_PROP_FPS)
+            setting["FrameCount"] =  int(videoFile.get(cv2.CAP_PROP_FRAME_COUNT))
+            setting["FrameStart"] = 0 
+            setting["FrameEnd"] =  setting["FrameCount"]
+            
+            
+            
         response = requests.get(jsonRet["thumbnail"])
         with open(ProjectFolderLink + "\\" + title + "\\thumbnail.jpg", "wb") as file:
             file.write(response.content)

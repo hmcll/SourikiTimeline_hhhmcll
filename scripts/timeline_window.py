@@ -73,12 +73,12 @@ def SaveCostFrame(CostFrame : list['SkillUse']):
 def DetectSkills():
     
     global skills
-    x,y,w,h = [static.config['skillBoxx'], static.config['skillBoxy'], static.config['skillBoxw'], static.config['skillBoxh']]
+    x,y,w,h = [static.config['SkillBoxx'], static.config['SkillBoxy'], static.config['SkillBoxw'], static.config['SkillBoxh']]
     
-    for row in static.Cost_Frame:
+    for id, row in enumerate(static.Cost_Frame):
         
         time = 1000 / static.config["FramePerSecond"] * row.FrameID
-        success = videoFile.set(cv2.CAP_PROP_POS_MSEC, time + row.SkillOffset + static.config['skillOffset'])
+        success = videoFile.set(cv2.CAP_PROP_POS_MSEC, time + row.SkillOffset + static.config['SkillOffset'])
 
         static.frameID = row.FrameID
 
@@ -103,7 +103,14 @@ def DetectSkills():
         row.DetectedSkill, similarity = CharaSkill.find_best_match(skills,row.SkillStringRaw,50)
         if row.DetectedSkill is None:
             row.DetectedSkill = ""
-        row.Disabled = row.DetectedSkill == ''
+        row.Disabled = row.DetectedSkill == ""
+        backtrace = id-1
+        while backtrace >=0:
+            if not static.Cost_Frame[id].Disabled:
+                if abs(static.Cost_Frame[id].ToCost - row.FromCost) < 0.2:
+                    row.FromCost = -row.FromCost
+                break
+            backtrace -= 1 
 
 def DetectSkillOnly():
     DetectSkills()
@@ -118,9 +125,10 @@ def LoadVideo():
     static.Cost_Frame = list['SkillUse']()
     last_cost = 0.0
     
-    x,y,w,h = [static.config['costBoxx'], static.config['costBoxy'], static.config['costBoxw'], static.config['costBoxh']]
-    tx,ty,tw,th = [static.config['timeBoxx'], static.config['timeBoxy'], static.config['timeBoxw'], static.config['timeBoxh']]
-    
+    x,y,w,h = [static.config['CostBoxx'], static.config['CostBoxy'], static.config['CostBoxw'], static.config['CostBoxh']]
+    tx,ty,tw,th = [static.config['TimeBoxx'], static.config['TimeBoxy'], static.config['TimeBoxw'], static.config['TimeBoxh']]
+    diffColor = [np.uint8(static.config['DiffColorr']),np.uint8(static.config['DiffColorg']), np.uint8(static.config['DiffColorb'])]
+    TotalCost = static.config['TotalCost']
     while True:
             
         success, image = videoFile.read()
@@ -134,7 +142,7 @@ def LoadVideo():
             break
         choppedImage = static.rawFrameImg[y : y + h, x : x + w, :]
         
-        cost = ocr_utils.calculateCost(choppedImage)
+        cost = ocr_utils.calculateCost(choppedImage,TotalCost , diffColor)
         
         if last_cost > cost + .7 :
             image = cv2.cvtColor(static.rawFrameImg[ty : ty + th, tx : tx + tw, :], cv2.COLOR_BGR2GRAY)
@@ -162,9 +170,9 @@ def LoadVideo():
 
 def drawRectangles():
     static.frameImage = np.copy(static.rawFrameImg)
-    cv2.rectangle(static.frameImage, (static.config['timeBoxx'], static.config['timeBoxy']),(static.config['timeBoxx'] + static.config['timeBoxw'], static.config['timeBoxy'] + static.config['timeBoxh']),(0,0,255),2)
-    cv2.rectangle(static.frameImage, (static.config['skillBoxx'], static.config['skillBoxy']),(static.config['skillBoxx'] + static.config['skillBoxw'], static.config['skillBoxy'] + static.config['skillBoxh']),(0,255,0),2)
-    cv2.rectangle(static.frameImage, (static.config['costBoxx'], static.config['costBoxy']),(static.config['costBoxx'] + static.config['costBoxw'], static.config['costBoxy'] + static.config['costBoxh']),(0,255,255),2)
+    cv2.rectangle(static.frameImage, (static.config['TimeBoxx'], static.config['TimeBoxy']),(static.config['TimeBoxx'] + static.config['TimeBoxw'], static.config['TimeBoxy'] + static.config['TimeBoxh']),(0,0,255),2)
+    cv2.rectangle(static.frameImage, (static.config['SkillBoxx'], static.config['SkillBoxy']),(static.config['SkillBoxx'] + static.config['SkillBoxw'], static.config['SkillBoxy'] + static.config['SkillBoxh']),(0,255,0),2)
+    cv2.rectangle(static.frameImage, (static.config['CostBoxx'], static.config['CostBoxy']),(static.config['CostBoxx'] + static.config['CostBoxw'], static.config['CostBoxy'] + static.config['CostBoxh']),(0,255,255),2)
 
 def sliderInt4(tag, itemWidth, itemValues, frameValues):
     imgui.separator_text(tag)
@@ -246,13 +254,13 @@ def PlotSkill(data : list['SkillUse'], halfWidth = 10):
     for row in data:
 
         SkillUseBoxLB = implot.plot_to_pixels(row.FrameID - halfWidth, row.ToCost)
-        SkillUseBoxRH = implot.plot_to_pixels(row.FrameID + halfWidth, row.FromCost)
-        offsetToFrame = (row.SkillOffset+static.config['skillOffset'])/ 1000 * static.config['FramePerSecond']
-        SkillDiffChecker = implot.plot_to_pixels(int(row.FrameID  +  offsetToFrame), (row.ToCost + row.FromCost) / 2)
+        SkillUseBoxRH = implot.plot_to_pixels(row.FrameID + halfWidth, abs(row.FromCost))
+        offsetToFrame = (row.SkillOffset+static.config['SkillOffset'])/ 1000 * static.config['FramePerSecond']
+        SkillDiffChecker = implot.plot_to_pixels(int(row.FrameID  +  offsetToFrame), (row.ToCost + abs(row.FromCost)) / 2)
         Brightness = 0XAAAAAAAA
         if not tooltipShown:
             if mousex > row.FrameID - halfWidth and mousex < row.FrameID + halfWidth:
-                if mousepos.y > row.ToCost and mousepos.y < row.FromCost:
+                if mousepos.y > row.ToCost and mousepos.y < abs(row.FromCost):
                     imgui.set_tooltip(row.ToString())
                     Brightness  = 0XFFDDDDDD
                     tooltipShown = True
@@ -280,23 +288,23 @@ def BoxSizePanel(panelWidth, panelHeight):
 
     imgui.separator_text("ボックス調整")
 
-    changeda, [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']] = sliderInt4("時間", panelWidth - 50, 
-            [static.config['timeBoxx'],static.config['timeBoxw'],static.config['timeBoxy'],static.config['timeBoxh']],
+    changeda, [static.config['TimeBoxx'],static.config['TimeBoxw'],static.config['TimeBoxy'],static.config['TimeBoxh']] = sliderInt4("時間", panelWidth - 50, 
+            [static.config['TimeBoxx'],static.config['TimeBoxw'],static.config['TimeBoxy'],static.config['TimeBoxh']],
             [static.config['FrameWidth'], static.config['FrameHeight']])
     
-    changedb, [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']] = sliderInt4("スキル", panelWidth - 50, 
-            [static.config['skillBoxx'],static.config['skillBoxw'],static.config['skillBoxy'],static.config['skillBoxh']],
+    changedb, [static.config['SkillBoxx'],static.config['SkillBoxw'],static.config['SkillBoxy'],static.config['SkillBoxh']] = sliderInt4("スキル", panelWidth - 50, 
+            [static.config['SkillBoxx'],static.config['SkillBoxw'],static.config['SkillBoxy'],static.config['SkillBoxh']],
             [static.config['FrameWidth'], static.config['FrameHeight']])
     
-    changedc, [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']] = sliderInt4("コスト", panelWidth - 50, 
-            [static.config['costBoxx'],static.config['costBoxw'],static.config['costBoxy'],static.config['costBoxh']],
+    changedc, [static.config['CostBoxx'],static.config['CostBoxw'],static.config['CostBoxy'],static.config['CostBoxh']] = sliderInt4("コスト", panelWidth - 50, 
+            [static.config['CostBoxx'],static.config['CostBoxw'],static.config['CostBoxy'],static.config['CostBoxh']],
             [static.config['FrameWidth'], static.config['FrameHeight']])
         
     if changeda or changedb or changedc:
         static.dataFrameID = -1
         drawRectangles()
-        with open(download_window.selectedProject + "\\setting.json", "w",encoding="utf-8") as file:
-            json.dump(static.config,file, ensure_ascii=False, indent=4)
+        static.Dirty = True
+        
     
     imgui.end_child()
 
@@ -304,12 +312,32 @@ def AnalyzationControlPanel(panelHeight):
 
     imgui.begin_child("##VideoControlPanel",[-1,panelHeight],window_flags= imgui.WindowFlags_.no_scrollbar)
     imgui.separator_text("動画識別コントロールパネル")
+    if static.showGraph:
+        if imgui.button("テーブル表示"):
+            static.showGraph = False
+
+    else:
+        if imgui.button("グラフ表示"):
+            static.showGraph = True
+            
+    if static.config['TotalCost']  > 10:
+        if imgui.button("20コスト"):
+            static.config['TotalCost'] = 10
+            static.Dirty = True
+
+    else:
+        if imgui.button("10コスト"):            
+            static.config['TotalCost'] = 20
+            static.Dirty = True
+
+
     if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
         imgui.push_style_color(imgui.Col_.button,0XFF007700)
         imgui.push_style_color(imgui.Col_.button_active,0XFF009900)
         imgui.push_style_color(imgui.Col_.button_hovered,0XFF003300)
         if imgui.button("スタートフレームセット"):
             static.config["FrameStart"] = static.frameID
+            static.Dirty = True
         imgui.pop_style_color(3)
         imgui.same_line(spacing= 50)
         imgui.push_style_color(imgui.Col_.button,0XFF000077)
@@ -317,10 +345,12 @@ def AnalyzationControlPanel(panelHeight):
         imgui.push_style_color(imgui.Col_.button_hovered,0XFF000033)
         if imgui.button("エンドフレームセット"):
             static.config["FrameEnd"] = static.frameID
+            static.Dirty = True
         imgui.pop_style_color(3)
     imgui.text("全体スキル判定オフセット")
-    changed, static.config['skillOffset']  = imgui.input_int("##SkillOffsetInput",static.config['skillOffset']) 
-        
+
+    changed, static.config['SkillOffset']  = imgui.input_int("##SkillOffsetInput",static.config['SkillOffset']) 
+    static.Dirty = static.Dirty or changed
     if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
         imgui.begin_vertical("LoadVideoButtons")
         if imgui.button("識別"):
@@ -343,14 +373,6 @@ def AnalyzationControlPanel(panelHeight):
         imgui.same_line()
         imgui.color_button("LoadVideoRunningIndicator", [255,255,0,255] ,imgui.ColorEditFlags_.no_tooltip | imgui.ColorEditFlags_.no_inputs)
     
-    if static.showGraph:
-        if imgui.button("テーブル表示"):
-            static.showGraph = False
-
-    else:
-        if imgui.button("グラフ表示"):
-            static.showGraph = True
-
 
     imgui.end_child()
 
@@ -358,19 +380,21 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
     
     imgui.begin_child("##コスト識別データ",[ -1,panelHeight])
     
-    
+    diffColor = [np.uint8(static.config['DiffColorr']),np.uint8(static.config['DiffColorg']), np.uint8(static.config['DiffColorb'])]
+
     if static.dataFrameID != static.frameID:
-        static.costImg = np.copy(static.rawFrameImg[static.config['costBoxy'] : static.config['costBoxy'] + static.config['costBoxh'], static.config['costBoxx']: static.config['costBoxx'] + static.config['costBoxw'],  :])
-        framediff = np.linalg.norm(static.costImg - [243,222,68],axis=2) / 1.8
-        bluediff = np.abs(static.costImg[:,:,0] - 243)
+        static.costImg = np.copy(static.rawFrameImg[static.config['CostBoxy'] : static.config['CostBoxy'] + static.config['CostBoxh'], static.config['CostBoxx']: static.config['CostBoxx'] + static.config['CostBoxw'],  :])
+
+        framediff = np.linalg.norm(static.costImg - diffColor,axis=2) / 1.8
+        bluediff = np.abs(static.costImg[:,:,0] - diffColor[0])
         min = np.min([framediff, bluediff],axis= 0)
 
         static.costVis1min = min
-        static.cosVis2min = cv2.resize(min,(200,20))
+        static.cosVis2min = cv2.resize(min,(int(static.config['TotalCost']) * 20,20))
         static.dataFrameID = static.frameID
-        static.currentCost = str( ocr_utils.calculateCost(static.costImg))
-        static.TimeImg = np.copy(static.rawFrameImg[static.config['timeBoxy'] : static.config['timeBoxy'] + static.config['timeBoxh'], static.config['timeBoxx']: static.config['timeBoxx'] + static.config['timeBoxw'],  :])
-        static.SkillImg = np.copy(static.rawFrameImg[static.config['skillBoxy'] : static.config['skillBoxy'] + static.config['skillBoxh'], static.config['skillBoxx']: static.config['skillBoxx'] + static.config['skillBoxw'],  :])
+        static.currentCost = str( ocr_utils.calculateCost(static.costImg,static.config['TotalCost'], diffColor))
+        static.TimeImg = np.copy(static.rawFrameImg[static.config['TimeBoxy'] : static.config['TimeBoxy'] + static.config['TimeBoxh'], static.config['TimeBoxx']: static.config['TimeBoxx'] + static.config['TimeBoxw'],  :])
+        static.SkillImg = np.copy(static.rawFrameImg[static.config['SkillBoxy'] : static.config['SkillBoxy'] + static.config['SkillBoxh'], static.config['SkillBoxx']: static.config['SkillBoxx'] + static.config['SkillBoxw'],  :])
 
         
     displaySize = (int(panelWidth -40), int(panelWidth/20 - 2))
@@ -379,7 +403,35 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
     imgui.text("スキル")
     immvision.image_display("##SkillImg", static.SkillImg, displaySize, refresh_image = True)
     imgui.text("コスト")
-    immvision.image_display("##costImage", static.costImg, displaySize, refresh_image = True)
+    imgui.color_button("識別色",[diffColor[2]/255,diffColor[1]/255,diffColor[0]/255,1])
+    if not hasattr(static, 'pts'):
+        static.imageParams = immvision.ImageParams()
+        static.imageParams.refresh_image= True
+        static.imageParams.can_resize=False
+        static.imageParams.image_display_size= displaySize
+        static.imageParams.pan_with_mouse=False
+        static.imageParams.zoom_with_mouse_wheel=False
+        static.imageParams.show_zoom_buttons=False
+        static.imageParams.show_alpha_channel_checkerboard=False
+        static.imageParams.show_pixel_info=False
+        static.imageParams.show_grid=False
+        static.imageParams.show_school_paper_background = False
+        static.imageParams.show_image_info = False
+        static.imageParams.show_options_panel = False
+        static.imageParams.show_options_button = False
+        static.imageParams.watched_pixels = []
+        static.imageParams.highlight_watched_pixels = False
+        
+    static.imageParams.show_options_panel = False
+
+    immvision.image("##costImage", static.costImg, static.imageParams)
+    if len(static.imageParams.watched_pixels) > 0:
+        point = static.imageParams.watched_pixels[0]
+        [static.config['DiffColorr'], static.config['DiffColorg'], static.config['DiffColorb']] = static.costImg[point[1],point[0],:].astype(float)
+        static.imageParams.watched_pixels = []
+        static.Dirty = True
+        static.dataFrameID = -1
+    
     imgui.text("識別用")
     immvision.image_display("##minImage",static.costVis1min, displaySize, refresh_image = True)
     imgui.text("計算用")        
@@ -403,7 +455,7 @@ def gui():
         static.Cost_Frame = LoadData(download_window.selectedProject)
         videoFile = cv2.VideoCapture(download_window.selectedProject + "\\video.mp4")
         
-        
+        static.Dirty = False
         LoadFrame(int(static.config["FrameStart"]),videoFile)
         
         static.dataFrameID = -1
@@ -444,7 +496,11 @@ def gui():
                 
                 for row  in static.Cost_Frame:
                     if not row.Disabled:
-                        file.write(str(row.FromCost) + "\t" + row.DetectedSkill + "\t" + row.TimeString + "\t" + row.Meta + "\n" )
+                        if row.FromCost > 0:
+                            file.write(str(abs(row.FromCost)))
+                        else:
+                            file.write("即") 
+                        file.write("\t" + row.DetectedSkill + "\t" + row.TimeString + "\t" + row.Meta + "\n" )
             subprocess.Popen("notepad.exe " + download_window.selectedProject + '\\PartialTimeline.txt')
 
     if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
@@ -462,20 +518,26 @@ def gui():
             
             implot.setup_axes("frame", "cost", implot.AxisFlags_.range_fit,implot.AxisFlags_.lock)
 
-            implot.setup_axis_limits(implot.ImAxis_.y1, 0, 10)
+            implot.setup_axis_limits(implot.ImAxis_.y1, 0, static.config['TotalCost'])
             implot.setup_axis_limits(implot.ImAxis_.x1, 0, static.config['FrameCount'])
+            implot.setup_axis_links(implot.ImAxis_.y1, implot.BoxedValue(0), implot.BoxedValue(static.config['TotalCost']))
+            
+            
             implot.setup_axis_limits_constraints(implot.ImAxis_.x1, 0, static.config['FrameCount'])
+            implot.setup_axis_limits_constraints(implot.ImAxis_.y1, 0, static.config['TotalCost'])
             PlotSkill( static.Cost_Frame)
             implot.end_plot()
             
     else:
+
         imgui.progress_bar(static.frameID/ static.config['FrameCount'],overlay="フレーム:" + str(int(static.frameID)))
         tableFlags =  imgui.TableFlags_.row_bg | imgui.TableFlags_.borders | imgui.TableFlags_.highlight_hovered_column | imgui.TableFlags_.scroll_y | imgui.TableFlags_.sizing_fixed_fit
-        if imgui.begin_table("##cost table",columns = 9,flags=tableFlags):
+        if imgui.begin_table("##cost table",columns = 10,flags=tableFlags):
             imgui.table_setup_scroll_freeze(0,1)
             imgui.table_setup_column("無効化")
+            imgui.table_setup_column("フレーム", flags=imgui.TableColumnFlags_.width_fixed )
             imgui.table_setup_column("コスト", flags=imgui.TableColumnFlags_.width_stretch )
-            imgui.table_setup_column("時間", flags=imgui.TableColumnFlags_.width_stretch )
+            imgui.table_setup_column("時間", flags=imgui.TableColumnFlags_.width_fixed)
             
             imgui.table_setup_column("生徒", flags=imgui.TableColumnFlags_.width_stretch )
             imgui.table_setup_column("スキル判定オフセット(ms)", flags=imgui.TableColumnFlags_.width_stretch )
@@ -486,14 +548,42 @@ def gui():
             imgui.table_setup_column("スキルフレーム")
             imgui.table_headers_row()
 
-            for rowID in range(len(static.Cost_Frame)):
-                row = static.Cost_Frame[rowID]
+            for rowID ,row in enumerate(static.Cost_Frame):
+                
                 imgui.table_next_row()
                 imgui.table_next_column()
                 changed1, static.Cost_Frame[rowID].Disabled = imgui.checkbox("##Disabled" + str(rowID),row.Disabled)
                 imgui.table_next_column()
-                changed3, static.Cost_Frame[rowID].FromCost = imgui.input_float("##FromCost" + str(rowID),row.FromCost,0.1,1.0,'%.1f',imgui.InputTextFlags_.auto_select_all)
-                 
+                imgui.text(str(int(row.FrameID)))
+                imgui.table_next_column()
+                realFromCost = static.Cost_Frame[rowID].FromCost 
+                isInstant = realFromCost < 0
+                realFromCost = abs(realFromCost)
+                if isInstant :
+                    
+                    imgui.push_style_color(imgui.Col_.button,0XFF007700)
+                    imgui.push_style_color(imgui.Col_.button_active,0XFF000000)
+                    imgui.push_style_color(imgui.Col_.button_hovered,0XFF002200)
+                    if imgui.button("即##" + str(rowID)):
+                        isInstant = False
+                    imgui.pop_style_color(3)
+                    
+                else:
+                    imgui.push_style_color(imgui.Col_.button,0XFF000000)
+                    imgui.push_style_color(imgui.Col_.button_active,0XFF007700)
+                    imgui.push_style_color(imgui.Col_.button_hovered,0XFF005500)
+                    
+                    if imgui.small_button("@##" + str(rowID)):
+                        isInstant = True
+                    imgui.pop_style_color(3)
+                
+                imgui.same_line()    
+                changed3, realFromCost = imgui.input_float("##FromCost" + str(rowID),realFromCost,0.1,1.0,'%.1f',imgui.InputTextFlags_.auto_select_all)
+            
+                if isInstant:
+                    static.Cost_Frame[rowID].FromCost = realFromCost * -1
+                else:
+                    static.Cost_Frame[rowID].FromCost = realFromCost
                 imgui.table_next_column()
                 imgui.text(row.TimeString)
                  
@@ -501,7 +591,7 @@ def gui():
                 imgui.text(row.SkillStringRaw)
 
                 imgui.table_next_column()
-                changed4, static.Cost_Frame[rowID].SkillOffset = imgui.input_int("##SkillOffset" + str(rowID),row.SkillOffset,1,10,imgui.InputTextFlags_.auto_select_all)
+                changed4, static.Cost_Frame[rowID].SkillOffset = imgui.input_int("##SkillOffset" + str(rowID),row.SkillOffset,1,int(static.config['totalCost']),imgui.InputTextFlags_.auto_select_all)
                 
                 
                 imgui.table_next_column()
@@ -519,10 +609,15 @@ def gui():
                     LoadFrame(row.FrameID,videoFile)
                 imgui.table_next_column()
                 if imgui.button("スキルフレーム##" + str(rowID)):
-                    LoadFrame(row.FrameID + 0.001*(row.SkillOffset + static.config['skillOffset']) *static.config["FramePerSecond"], videoFile )
+                    LoadFrame(row.FrameID + 0.001*(row.SkillOffset + static.config['SkillOffset']) *static.config["FramePerSecond"], videoFile )
                 
                     
             imgui.end_table()
         
     imgui.end_child()
+    if static.Dirty:
+        
+        with open(download_window.selectedProject + "\\setting.json", "w",encoding="utf-8") as file:
+            json.dump(static.config,file, ensure_ascii=False, indent=4)
+            static.Dirty = False
     return ret

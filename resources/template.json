@@ -1,0 +1,20 @@
+{
+    
+    "TimeBoxx": 50 ,
+    "TimeBoxy": 50,
+    "TimeBoxw": 50,
+    "TimeBoxh": 50,
+    "SkillBoxx": 150,
+    "SkillBoxy": 150,
+    "SkillBoxw": 50,
+    "SkillBoxh": 50,
+    "CostBoxx": 250,
+    "CostBoxy": 250,
+    "CostBoxw": 50,
+    "CostBoxh": 50,
+    "SkillOffset": 500,
+    "TotalCost": 10,
+    "DiffColorr": 243,
+    "DiffColorg": 222,
+    "DiffColorb": 68
+}
