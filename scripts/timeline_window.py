@@ -142,7 +142,7 @@ def LoadVideo():
             break
         choppedImage = static.rawFrameImg[y : y + h, x : x + w, :]
         
-        cost = ocr_utils.calculateCost(choppedImage,int(static.config["Threshold"]),TotalCost , diffColor)
+        cost = ocr_utils.CalculateCost(choppedImage,int(static.config["Threshold"]),TotalCost , diffColor,5)
         
         if last_cost > cost + .7 :
             image = cv2.cvtColor(static.rawFrameImg[ty : ty + th, tx : tx + tw, :], cv2.COLOR_BGR2GRAY)
@@ -394,10 +394,10 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
             static.costVis1min = cv2.resize(max,(400,20))
             colsum = np.sum((max > static.config["Threshold"]),axis = 0)
             
-            static.costVis2min = cv2.resize(((np.asarray([colsum])> 15)*255).astype(np.uint8),(400,20))
+            static.costVis2min = cv2.resize(((np.asarray([colsum])> 12)*255).astype(np.uint8),(400,20))
 
             static.dataFrameID = static.frameID
-            static.currentCost = str( ocr_utils.calculateCost(static.costImg,int(static.config["Threshold"]), static.config['TotalCost'], diffColor))
+            static.currentCost = str( ocr_utils.CalculateCost(static.costImg,int(static.config["Threshold"]), static.config['TotalCost'], diffColor,5))
             static.TimeImg = np.copy(static.rawFrameImg[static.config['TimeBoxy'] : static.config['TimeBoxy'] + static.config['TimeBoxh'], static.config['TimeBoxx']: static.config['TimeBoxx'] + static.config['TimeBoxw'],  :])
             static.SkillImg = np.copy(static.rawFrameImg[static.config['SkillBoxy'] : static.config['SkillBoxy'] + static.config['SkillBoxh'], static.config['SkillBoxx']: static.config['SkillBoxx'] + static.config['SkillBoxw'],  :])
 
