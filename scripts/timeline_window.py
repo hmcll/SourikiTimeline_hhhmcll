@@ -127,7 +127,7 @@ def LoadVideo():
     
     x,y,w,h = [static.config['CostBoxx'], static.config['CostBoxy'], static.config['CostBoxw'], static.config['CostBoxh']]
     tx,ty,tw,th = [static.config['TimeBoxx'], static.config['TimeBoxy'], static.config['TimeBoxw'], static.config['TimeBoxh']]
-    diffColor = [np.uint8(static.config['DiffColorr']),np.uint8(static.config['DiffColorg']), np.uint8(static.config['DiffColorb'])]
+    diffColor = [np.uint8(static.config['DiffColorb']),np.uint8(static.config['DiffColorg']), np.uint8(static.config['DiffColorr'])]
     TotalCost = static.config['TotalCost']
     while True:
             
@@ -142,7 +142,7 @@ def LoadVideo():
             break
         choppedImage = static.rawFrameImg[y : y + h, x : x + w, :]
         
-        cost = ocr_utils.calculateCost(choppedImage,TotalCost , diffColor)
+        cost = ocr_utils.calculateCost(choppedImage,int(static.config["Threshold"]),TotalCost , diffColor)
         
         if last_cost > cost + .7 :
             image = cv2.cvtColor(static.rawFrameImg[ty : ty + th, tx : tx + tw, :], cv2.COLOR_BGR2GRAY)
@@ -380,64 +380,80 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
     
     imgui.begin_child("##コスト識別データ",[ -1,panelHeight])
     
-    diffColor = [np.uint8(static.config['DiffColorr']),np.uint8(static.config['DiffColorg']), np.uint8(static.config['DiffColorb'])]
+    if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
+        diffColor = [np.uint8(static.config['DiffColorb']),np.uint8(static.config['DiffColorg']), np.uint8(static.config['DiffColorr'])]
 
-    if static.dataFrameID != static.frameID:
-        static.costImg = np.copy(static.rawFrameImg[static.config['CostBoxy'] : static.config['CostBoxy'] + static.config['CostBoxh'], static.config['CostBoxx']: static.config['CostBoxx'] + static.config['CostBoxw'],  :])
+        if static.dataFrameID != static.frameID:
+            static.costImg = np.copy(static.rawFrameImg[static.config['CostBoxy'] : static.config['CostBoxy'] + static.config['CostBoxh'], static.config['CostBoxx']: static.config['CostBoxx'] + static.config['CostBoxw'],  :])
+            
+            ddiff = abs(static.costImg.astype(int) - np.asarray(diffColor).astype(int)).astype(np.uint8)
+            ddiffc = abs(static.costImg.astype(int) - np.asarray((np.asarray([255,255,255]) - diffColor) * 0.7 +diffColor).astype(int)).astype(np.uint8)
+            min = np.min([ddiff,ddiffc],axis=0)
+            max = np.max(min,axis=2)
 
-        framediff = np.linalg.norm(static.costImg - diffColor,axis=2) / 1.8
-        bluediff = np.abs(static.costImg[:,:,0] - diffColor[0])
-        min = np.min([framediff, bluediff],axis= 0)
+            static.costVis1min = cv2.resize(max,(400,20))
+            colsum = np.sum((max > static.config["Threshold"]),axis = 0)
+            
+            static.costVis2min = cv2.resize(((np.asarray([colsum])> 15)*255).astype(np.uint8),(400,20))
 
-        static.costVis1min = min
-        static.cosVis2min = cv2.resize(min,(int(static.config['TotalCost']) * 20,20))
-        static.dataFrameID = static.frameID
-        static.currentCost = str( ocr_utils.calculateCost(static.costImg,static.config['TotalCost'], diffColor))
-        static.TimeImg = np.copy(static.rawFrameImg[static.config['TimeBoxy'] : static.config['TimeBoxy'] + static.config['TimeBoxh'], static.config['TimeBoxx']: static.config['TimeBoxx'] + static.config['TimeBoxw'],  :])
-        static.SkillImg = np.copy(static.rawFrameImg[static.config['SkillBoxy'] : static.config['SkillBoxy'] + static.config['SkillBoxh'], static.config['SkillBoxx']: static.config['SkillBoxx'] + static.config['SkillBoxw'],  :])
+            static.dataFrameID = static.frameID
+            static.currentCost = str( ocr_utils.calculateCost(static.costImg,int(static.config["Threshold"]), static.config['TotalCost'], diffColor))
+            static.TimeImg = np.copy(static.rawFrameImg[static.config['TimeBoxy'] : static.config['TimeBoxy'] + static.config['TimeBoxh'], static.config['TimeBoxx']: static.config['TimeBoxx'] + static.config['TimeBoxw'],  :])
+            static.SkillImg = np.copy(static.rawFrameImg[static.config['SkillBoxy'] : static.config['SkillBoxy'] + static.config['SkillBoxh'], static.config['SkillBoxx']: static.config['SkillBoxx'] + static.config['SkillBoxw'],  :])
 
-        
-    displaySize = (int(panelWidth -40), int(panelWidth/20 - 2))
-    imgui.text("タイム")
-    immvision.image_display("##TimeImg", static.TimeImg, displaySize, refresh_image = True)
-    imgui.text("スキル")
-    immvision.image_display("##SkillImg", static.SkillImg, displaySize, refresh_image = True)
-    imgui.text("コスト")
-    imgui.color_button("識別色",[diffColor[2]/255,diffColor[1]/255,diffColor[0]/255,1])
-    if not hasattr(static, 'pts'):
-        static.imageParams = immvision.ImageParams()
-        static.imageParams.refresh_image= True
-        static.imageParams.can_resize=False
-        static.imageParams.image_display_size= displaySize
-        static.imageParams.pan_with_mouse=False
-        static.imageParams.zoom_with_mouse_wheel=False
-        static.imageParams.show_zoom_buttons=False
-        static.imageParams.show_alpha_channel_checkerboard=False
-        static.imageParams.show_pixel_info=False
-        static.imageParams.show_grid=False
-        static.imageParams.show_school_paper_background = False
-        static.imageParams.show_image_info = False
+
+        displaySize = (int(panelWidth -40), int(panelWidth/20 - 2))
+        imgui.begin_vertical("##time")
+        imgui.text("タイム")
+        immvision.image_display("##TimeImg", static.TimeImg, displaySize, refresh_image = True)
+        imgui.end_vertical()
+        imgui.begin_vertical("skill")
+        imgui.text("スキル")
+        immvision.image_display("##SkillImg", static.SkillImg, displaySize, refresh_image = True)
+        imgui.end_vertical()
+        imgui.text("コスト")
+        imgui.color_button("識別色",[diffColor[2]/255,diffColor[1]/255,diffColor[0]/255,1])
+        imgui.same_line()
+        changed, static.config["Threshold"] = imgui.slider_int("##thresholdSlider", int(static.config["Threshold"]),0,255,flags=imgui.SliderFlags_.always_clamp)
+        static.Dirty = changed or static.Dirty
+        if changed:
+            static.dataFrameID = -1
+
+        if not hasattr(static, 'pts'):
+            static.imageParams = immvision.ImageParams()
+            static.imageParams.refresh_image= True
+            static.imageParams.can_resize=False
+            static.imageParams.image_display_size= displaySize
+            static.imageParams.pan_with_mouse=False
+            static.imageParams.zoom_with_mouse_wheel=False
+            static.imageParams.show_zoom_buttons=False
+            static.imageParams.show_alpha_channel_checkerboard=False
+            static.imageParams.show_pixel_info=False
+            static.imageParams.show_grid=False
+            static.imageParams.show_school_paper_background = False
+            static.imageParams.show_image_info = False
+            static.imageParams.show_options_panel = False
+            static.imageParams.show_options_button = False
+            static.imageParams.watched_pixels = []
+            static.imageParams.highlight_watched_pixels = False
+            
         static.imageParams.show_options_panel = False
-        static.imageParams.show_options_button = False
-        static.imageParams.watched_pixels = []
-        static.imageParams.highlight_watched_pixels = False
-        
-    static.imageParams.show_options_panel = False
 
-    immvision.image("##costImage", static.costImg, static.imageParams)
-    if len(static.imageParams.watched_pixels) > 0:
-        point = static.imageParams.watched_pixels[0]
-        [static.config['DiffColorr'], static.config['DiffColorg'], static.config['DiffColorb']] = static.costImg[point[1],point[0],:].astype(float)
-        static.imageParams.watched_pixels = []
-        static.Dirty = True
-        static.dataFrameID = -1
-    
-    imgui.text("識別用")
-    immvision.image_display("##minImage",static.costVis1min, displaySize, refresh_image = True)
-    imgui.text("計算用")        
-    immvision.image_display("##calImage", static.cosVis2min, displaySize, refresh_image = True)
-    
-    imgui.text("Cost :" + static.currentCost)
+        immvision.image("##costImage", static.costImg, static.imageParams)
+        if len(static.imageParams.watched_pixels) > 0:
+            point = static.imageParams.watched_pixels[0]
+            [static.config['DiffColorb'], static.config['DiffColorg'], static.config['DiffColorr']] = static.costImg[point[1],point[0],:].astype(float)
+            static.imageParams.watched_pixels = []
+            static.Dirty = True
+            static.dataFrameID = -1
+        
+        imgui.text("識別色確認、黒い部分はコストとして識別されている")
+        immvision.image_display("##minImage",static.costVis1min, displaySize, refresh_image = True)
+        imgui.text("計算確認、黒い部分はコストとして識別されている")        
+        immvision.image_display("##calImage", static.costVis2min, displaySize, refresh_image = True)
+        
+        imgui.text("Cost :" + static.currentCost)
+        
 
     imgui.end_child()
 
@@ -489,21 +505,21 @@ def gui():
     imgui.separator_text("ジェネラル")
     imgui.begin_child("##OutputWindow",[-1,videoHeight/3 - 50])
     
-    if hasattr(static, 'Cost_Frame') and static.Cost_Frame is not None and len(static.Cost_Frame) > 0:
-        if imgui.button("タイムライン出力"):
-            
-            with open(download_window.selectedProject + '\\PartialTimeline.txt', 'w', newline='', encoding='utf-8') as file:
-                
-                for row  in static.Cost_Frame:
-                    if not row.Disabled:
-                        if row.FromCost > 0:
-                            file.write(str(abs(row.FromCost)))
-                        else:
-                            file.write("即") 
-                        file.write("\t" + row.DetectedSkill + "\t" + row.TimeString + "\t" + row.Meta + "\n" )
-            subprocess.Popen("notepad.exe " + download_window.selectedProject + '\\PartialTimeline.txt')
-
     if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
+        if hasattr(static, 'Cost_Frame') and static.Cost_Frame is not None and len(static.Cost_Frame) > 0:
+            if imgui.button("タイムライン出力"):
+                
+                with open(download_window.selectedProject + '\\PartialTimeline.txt', 'w', newline='', encoding='utf-8') as file:
+                    
+                    for row  in static.Cost_Frame:
+                        if not row.Disabled:
+                            if row.FromCost > 0:
+                                file.write(str(abs(row.FromCost)))
+                            else:
+                                file.write("即") 
+                            file.write("\t" + row.DetectedSkill + "\t" + row.TimeString + "\t" + row.Meta + "\n" )
+                subprocess.Popen("notepad.exe " + download_window.selectedProject + '\\PartialTimeline.txt')
+
         if imgui.button("プロジェクト選択へ戻る"):
             videoFile = None
             ret = 0
@@ -591,7 +607,7 @@ def gui():
                 imgui.text(row.SkillStringRaw)
 
                 imgui.table_next_column()
-                changed4, static.Cost_Frame[rowID].SkillOffset = imgui.input_int("##SkillOffset" + str(rowID),row.SkillOffset,1,int(static.config['totalCost']),imgui.InputTextFlags_.auto_select_all)
+                changed4, static.Cost_Frame[rowID].SkillOffset = imgui.input_int("##SkillOffset" + str(rowID),row.SkillOffset,1,int(static.config['TotalCost']),imgui.InputTextFlags_.auto_select_all)
                 
                 
                 imgui.table_next_column()

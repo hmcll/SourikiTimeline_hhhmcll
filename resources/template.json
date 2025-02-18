@@ -16,5 +16,6 @@
     "TotalCost": 10,
     "DiffColorr": 243,
     "DiffColorg": 222,
-    "DiffColorb": 68
+    "DiffColorb": 68,
+    "Threshold": 25
 }
