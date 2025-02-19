@@ -224,6 +224,60 @@ def LoadFrame(FrameID, video):
         static.frameID = FrameID
         drawRectangles()
 
+def PlotSeekbar(size):
+    
+    if implot.begin_plot("##seekbar", size,implot.Flags_.no_frame):
+        
+        implot.setup_axes("", "", implot.AxisFlags_.range_fit | implot.AxisFlags_.no_label | implot.AxisFlags_.none ,implot.AxisFlags_.lock | implot.AxisFlags_.no_decorations )
+        
+        implot.setup_axis_limits(implot.ImAxis_.y1, 0, static.config['TotalCost'])
+        implot.setup_axis_limits(implot.ImAxis_.x1, 0, static.config['FrameCount'])
+        implot.setup_axis_links(implot.ImAxis_.y1, implot.BoxedValue(0), implot.BoxedValue(static.config['TotalCost']))
+        
+        
+        implot.setup_axis_limits_constraints(implot.ImAxis_.x1, 0, static.config['FrameCount'])
+        implot.setup_axis_limits_constraints(implot.ImAxis_.y1, 0, static.config['TotalCost'])
+
+        draw_list = implot.get_plot_draw_list()
+
+
+        limit = implot.get_plot_limits()
+        
+        ret = implot.drag_line_x(0,static.config["FrameStart"],imgui.color_convert_u32_to_float4(0XFF00FF00),out_clicked=True,held=True)
+        if ret[2] and not ret[4]:
+            static.config["FrameStart"] = np.floor(ret[1])
+            pass
+
+        lb = implot.plot_to_pixels(limit.x.min,limit.y.min)
+        ru = implot.plot_to_pixels(limit.x.max,limit.y.max)
+        draw_list.push_clip_rect(imgui.ImVec2(lb.x,ru.y),imgui.ImVec2(ru.x,lb.y))
+
+        mousepos = implot.get_plot_mouse_pos()
+        mousex = min(static.config['FrameCount'], np.round(mousepos.x))
+        rangeBoxLU = implot.plot_to_pixels(static.config["FrameStart"], limit.y.max)
+        rangeBoxRD = implot.plot_to_pixels(static.config["FrameEnd"], limit.y.min)
+
+        draw_list.add_rect_filled(rangeBoxLU, rangeBoxRD, 0X11FFFFFF)
+        if False:#implot.is_plot_hovered():
+
+            top  = implot.plot_to_pixels(mousex - halfWidth, limit.y.max)
+            bot = implot.plot_to_pixels(mousex + halfWidth, limit.y.min)
+            
+            draw_list.add_rect_filled(top, bot, 0X66FFFFFF)
+            if imgui.is_mouse_released(imgui.MouseButton_.left) and imgui.get_mouse_drag_delta(imgui.MouseButton_.left).x == 0:
+                global videoFile
+                if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
+                    LoadFrame(mousex,videoFile)
+
+        draw_list.add_line(implot.plot_to_pixels(static.frameID, limit.y.max), implot.plot_to_pixels(static.frameID, limit.y.min), 0XFFFFFFFF)
+        draw_list.add_line([rangeBoxLU.x,rangeBoxLU.y],[rangeBoxLU.x,rangeBoxRD.y], 0XFF00FF00)
+        draw_list.add_line([rangeBoxRD.x,rangeBoxLU.y],[rangeBoxRD.x,rangeBoxRD.y], 0XFF0000FF)
+        
+        
+        draw_list.pop_clip_rect()
+        implot.end_plot()
+
+
 def PlotSkill(data : list['SkillUse'], halfWidth = 10):
 
     draw_list = implot.get_plot_draw_list()
@@ -317,9 +371,9 @@ def BoxSizePanel(panelWidth, panelHeight):
     
     imgui.end_group()
 
-def AnalyzationControlPanel(panelHeight):
+def AnalyzationControlPanel(panelWidth, panelHeight):
 
-    imgui.begin_child("##VideoControlPanel",[-1,panelHeight],window_flags= imgui.WindowFlags_.no_scrollbar)
+    imgui.begin_child("##VideoControlPanel",[panelWidth,panelHeight],window_flags= imgui.WindowFlags_.no_scrollbar)
     imgui.separator_text("動画識別コントロールパネル")
 
             
@@ -596,6 +650,20 @@ def Init():
     static.dataFrameID = -1
     static.BottomWindowSwitch = 0
 
+def WriteTimeLine(path, Cost_Frame):
+    
+    with open(path, 'w', newline='', encoding='utf-8') as file:
+        
+        for row  in Cost_Frame:
+            if not row.Disabled:
+                if row.FromCost > 0:
+                    file.write(str(abs(row.FromCost)))
+                else:
+                    file.write("即") 
+                file.write("\t" + row.DetectedSkill + "\t" + row.TimeString + "\t" + row.Meta + "\n" )
+    subprocess.Popen("notepad.exe " + path)
+
+
 def gui():
     
     ret = 1
@@ -613,14 +681,9 @@ def gui():
     videoViewWidth = int(windowWidth / 2)
     videoHeight = int(videoViewWidth / 16 * 9)
     sideBuffer = (windowWidth-videoViewWidth)/2
-    #left panel
-    imgui.begin_child("##LeftPanel",[sideBuffer-10,videoHeight])
-
-    #BoxSizePanel(sideBuffer, videoHeight/2 - 25)
-    AnalyzationControlPanel(videoHeight/2)
-
-    imgui.end_child()
-
+    
+    AnalyzationControlPanel(sideBuffer - 20, videoHeight/2)
+    
     imgui.same_line()
     
     immvision.image_display("##frame", static.frameImage,(videoViewWidth, videoHeight), refresh_image = True)
@@ -628,33 +691,20 @@ def gui():
     imgui.same_line()
     
     imgui.begin_child("##RightPanel",[sideBuffer - 20,videoHeight],window_flags= imgui.WindowFlags_.no_scrollbar)
-
-
+    
     imgui.separator_text("ジェネラル")
-    imgui.begin_child("##OutputWindow",[-1,videoHeight])
     
     if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
         if hasattr(static, 'Cost_Frame') and static.Cost_Frame is not None and len(static.Cost_Frame) > 0:
             if imgui.button("タイムライン出力"):
-                
-                with open(download_window.selectedProject + '\\PartialTimeline.txt', 'w', newline='', encoding='utf-8') as file:
-                    
-                    for row  in static.Cost_Frame:
-                        if not row.Disabled:
-                            if row.FromCost > 0:
-                                file.write(str(abs(row.FromCost)))
-                            else:
-                                file.write("即") 
-                            file.write("\t" + row.DetectedSkill + "\t" + row.TimeString + "\t" + row.Meta + "\n" )
-                subprocess.Popen("notepad.exe " + download_window.selectedProject + '\\PartialTimeline.txt')
-
+                WriteTimeLine(download_window.selectedProject + '\\PartialTimeline.txt', static.Cost_Frame)
         if imgui.button("プロジェクト選択へ戻る"):
             videoFile = None
             ret = 0
-    imgui.end_child()
+            
 
     imgui.end_child()
-
+    PlotSeekbar((windowWidth,500))
     height = windowHeight - videoHeight - 20
     imgui.begin_child("##DataWindow",(-1,-1),window_flags=imgui.WindowFlags_.no_scroll_with_mouse| imgui.WindowFlags_.no_scrollbar)
     imgui.begin_vertical("##DataWindowSelector",(50,height))
@@ -681,7 +731,7 @@ def gui():
     elif static.BottomWindowSwitch == 1:
         DrawTable()
     else:
-        BoxVisualizationPanel(windowWidth - 150,height)
+        BoxVisualizationPanel(windowWidth - 50,height)
     imgui.end_child()
     
     imgui.end_child()
