@@ -18,11 +18,8 @@ def CalculateCost(choppedImage,threshold:int, totalCost: int, DiffColor :np.matr
     max = np.max(min,axis=2)
     
     
-    min = max
-
-    
     # optimizable
-    colsum = np.sum((min > threshold),axis = 0)
+    colsum = np.sum((max > threshold),axis = 0)
     
     id = 0
     
