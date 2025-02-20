@@ -181,7 +181,7 @@ def sliderInt4(tag, itemWidth,itemHeight, itemValues, frameValues, color):
 
     maxValues = [frameValues[0] - itemValues[1], frameValues[0] - itemValues[0], frameValues[1] - itemValues[3], frameValues[1] - itemValues[2]]
     changed = False
-    for i, name in enumerate(["x","w","y","z"]):
+    for i, name in enumerate(["x","w","y","h"]):
         
         imgui.begin_group()
         imgui.push_id(name)
@@ -321,6 +321,8 @@ def PlotSkill(data : list['SkillUse'], halfWidth = 10):
 
         SkillUseBoxLB = implot.plot_to_pixels(row.FrameID - halfWidth, row.ToCost)
         SkillUseBoxRH = implot.plot_to_pixels(row.FrameID + halfWidth, abs(row.FromCost))
+        SkillUseLineTop = implot.plot_to_pixels(row.FrameID, row.ToCost)
+        SkillUseLineBot = implot.plot_to_pixels(row.FrameID, abs(row.FromCost))
         offsetToFrame = (row.SkillOffset+static.config['SkillOffset'])/ 1000 * static.config['FramePerSecond']
         SkillDiffChecker = implot.plot_to_pixels(int(row.FrameID  +  offsetToFrame), (row.ToCost + abs(row.FromCost)) / 2)
         Brightness = 0XAAAAAAAA
@@ -328,15 +330,19 @@ def PlotSkill(data : list['SkillUse'], halfWidth = 10):
             if mousex > row.FrameID - halfWidth and mousex < row.FrameID + halfWidth:
                 if mousepos.y > row.ToCost and mousepos.y < abs(row.FromCost):
                     imgui.set_tooltip(row.ToString())
-                    Brightness  = 0XFFDDDDDD
+                    Brightness  = 0XDDDDDDDD
                     tooltipShown = True
                     if imgui.is_mouse_released(imgui.MouseButton_.middle) and imgui.get_mouse_drag_delta(imgui.MouseButton_.middle).x == 0:
                         row.Disabled = not row.Disabled 
                         SaveCostFrame(static.Cost_Frame)
+        color = (0XFF00FF00 if row.DetectedSkill != "" else 0XFF00FFFF)
+
         if row.Disabled:
-            draw_list.add_rect(SkillUseBoxLB, SkillUseBoxRH, Brightness & (0XFF00FF00 if row.DetectedSkill != "" else 0XFF00FFFF))
+            draw_list.add_rect(SkillUseBoxLB, SkillUseBoxRH, Brightness &  color)
+            draw_list.add_line(SkillUseLineTop, SkillUseLineBot, (Brightness +0X11111111) & color)
         else:
-            draw_list.add_rect_filled(SkillUseBoxLB, SkillUseBoxRH, Brightness & (0XFF00FF00 if row.DetectedSkill != "" else 0XFF00FFFF))
+            draw_list.add_rect_filled(SkillUseBoxLB, SkillUseBoxRH, Brightness & color)
+            draw_list.add_line(SkillUseLineTop, SkillUseLineBot, (Brightness +0X11111111) & color)
                 
             if SkillUseBoxRH.x > SkillDiffChecker.x:
 
@@ -464,16 +470,17 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
         static.SkillImg = np.copy(static.rawFrameImg[static.config['SkillBoxy'] : static.config['SkillBoxy'] + static.config['SkillBoxh'], static.config['SkillBoxx']: static.config['SkillBoxx'] + static.config['SkillBoxw'],  :])
     
     imgui.begin_group()
-    displayh = int(np.round(panelHeight/9))
+    displayh = int(np.round(panelHeight/5))
     
-    panelw = int(panelWidth/2 -40)
+    panelw = int(panelWidth *3/8 -40)
     Imgwhr = static.TimeImg.shape[1]/static.TimeImg.shape[0]
     displayw = Imgwhr*displayh
     if displayw > panelw:
         displayw = panelw
-        displayh = np.round(panelw/Imgwhr)
+        displayh = int(np.round(panelw/Imgwhr))
     immvision.image_display("タイム##TimeImg", static.TimeImg, (int(np.round(displayw)),displayh), refresh_image = True)
-    
+    imgui.same_line()
+    displayh = int(np.round(panelHeight/7))
     Imgwhr = static.SkillImg.shape[1]/static.SkillImg.shape[0]
     displayw = Imgwhr*displayh
     if displayw > panelw:
@@ -483,18 +490,20 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
     immvision.image_display("スキル##SkillImg", static.SkillImg, (int(np.round(displayw)),displayh), refresh_image = True)
     
 
-    imgui.text("コスト")
+    displayh = int(np.round(panelHeight/5))
+    imgui.text("コストの画像でコストの色を選択（ダブルクリック）")
     imgui.same_line()
     imgui.color_button("識別色",[diffColor[2]/255,diffColor[1]/255,diffColor[0]/255,1])
-    imgui.same_line()
-    changed, static.config["Threshold"] = imgui.slider_int("##thresholdSlider", int(static.config["Threshold"]),0,255,flags=imgui.SliderFlags_.always_clamp)
+    
+    imgui.set_next_item_width(panelWidth / 2 - 120)
+    changed, static.config["Threshold"] = imgui.slider_int("判定微調整（高いほど緩い）", int(static.config["Threshold"]),0,255,flags=imgui.SliderFlags_.always_clamp)
     static.Dirty = changed or static.Dirty
     if changed:
         static.dataFrameID = -1
 
     displayh = int(np.round(panelHeight/5))
 
-    panelw = int(panelWidth * 3 / 4 - 40)
+    panelw = int(panelWidth * 3 / 4 - 120)
     Imgwhr = static.costImg.shape[1]/static.costImg.shape[0]
     displayw = Imgwhr*displayh
     if displayw > panelw:
@@ -529,10 +538,11 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
         static.Dirty = True
         static.dataFrameID = -1
     
+    
     imgui.text("識別色確認、黒い部分はコストとして識別されている")
-    immvision.image_display("##minImage",static.costVis1min, (int(np.round(displayw)),displayh), refresh_image = True)
+    immvision.image_display("##minImage",static.costVis1min, (int(panelw),int(panelw/20)), refresh_image = True)
     imgui.text("計算確認、黒い部分はコストとして識別されている")        
-    immvision.image_display("##calImage", static.costVis2min, (int(np.round(displayw)),displayh), refresh_image = True)
+    immvision.image_display("##calImage", static.costVis2min, (int(panelw),int(panelw/20)), refresh_image = True)
     
     imgui.text("Cost :" + static.currentCost)
     
@@ -664,7 +674,7 @@ def WriteTimeLine(path, Cost_Frame):
         for row  in Cost_Frame:
             if not row.Disabled:
                 if row.FromCost > 0:
-                    file.write(str(abs(row.FromCost)))
+                    file.write(str(round(abs(row.FromCost),1)))
                 else:
                     file.write("即") 
                 file.write("\t" + row.DetectedSkill + "\t" + row.TimeString + "\t" + row.Meta + "\n" )
@@ -716,7 +726,7 @@ def gui():
     
     imgui.begin_vertical("##DataWindowSelector",(50,height))
     
-    if imgui.button("テ\nー\nブ\nル",size=(50,((static.BottomWindowSwitch == 1) + 1) *height/4)):
+    if imgui.button("テ\n |\nブ\nル",size=(50,((static.BottomWindowSwitch == 1) + 1) *height/4)):
         static.BottomWindowSwitch = 1
         
     if imgui.button("グ\nラ\nフ",size=(50,((static.BottomWindowSwitch == 0) + 1) *height/4)):
