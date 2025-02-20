@@ -4,31 +4,25 @@ def CalculateCost(choppedImage,threshold:int, totalCost: int, DiffColor :np.matr
     
     choppedImage = cv2.resize(choppedImage, (400,15))
     
-    #framediff = np.linalg.norm(choppedImage - DiffColor,axis=2) / 1.8
-
-    #bluediff = np.abs(choppedImage[:,:,0] - DiffColor[0])
-
-    #min = np.min([framediff, bluediff],axis= 0)
-
-    #min = np.max(abs(choppedImage.astype(int) - np.asarray(DiffColor).astype(int)).astype(np.uint8),axis=2)
-
     ddiff = abs(choppedImage.astype(int) - np.asarray(DiffColor).astype(int)).astype(np.uint8)
     ddiffc = abs(choppedImage.astype(int) - np.asarray((np.asarray([255,255,255]) - DiffColor) * 0.5 +DiffColor).astype(int)).astype(np.uint8)
-    min = np.min([ddiff,ddiffc],axis=0)
-    max = np.max(min,axis=2)
-    
-    
+
+
     # optimizable
-    colsum = np.sum((max > threshold),axis = 0)
+    colsum = np.sum((np.max(np.min([ddiff,ddiffc],axis=0),axis=2) > threshold),axis = 0) < threshold2
     
     id = 0
-    
-    while id <  400 - 3:
+    n = len(colsum)
+    for i in range(n):
         
-        if colsum[id] > threshold2 and colsum[id+1] > threshold2 and colsum[id+2] > threshold2 and colsum[id+3] > threshold2:
+        start = max(0, i - 3)
+        end = min(n, i + 3 + 1)  # +1 to include i+units
+        
+        # Count the number of True values in the window
+        count_true = sum(colsum[start:end])
+        if count_true < 2:
+            id = i
             break
-        id += 1
-                
                 
 
     return np.round((id + 1) / (400 / totalCost), 1)

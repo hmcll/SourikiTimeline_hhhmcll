@@ -142,7 +142,7 @@ def LoadVideo():
             break
         choppedImage = static.rawFrameImg[y : y + h, x : x + w, :]
         
-        cost = ocr_utils.CalculateCost(choppedImage,int(static.config["Threshold"]),TotalCost , diffColor,5)
+        cost = ocr_utils.CalculateCost(choppedImage,int(static.config["Threshold"]),TotalCost , diffColor,12)
         
         if last_cost > cost + .7 :
             image = cv2.cvtColor(static.rawFrameImg[ty : ty + th, tx : tx + tw, :], cv2.COLOR_BGR2GRAY)
@@ -225,8 +225,8 @@ def LoadFrame(FrameID, video):
         drawRectangles()
 
 def PlotSeekbar(size):
-    
-    if implot.begin_plot("##seekbar", size,implot.Flags_.no_frame):
+    imgui.push_id("seekbar")
+    if implot.begin_plot("##seekbar", size,implot.Flags_.no_frame|implot.Flags_.canvas_only):
         
         implot.setup_axes("", "", implot.AxisFlags_.range_fit | implot.AxisFlags_.no_label | implot.AxisFlags_.none ,implot.AxisFlags_.lock | implot.AxisFlags_.no_decorations )
         
@@ -243,39 +243,43 @@ def PlotSeekbar(size):
 
         limit = implot.get_plot_limits()
         
-        ret = implot.drag_line_x(0,static.config["FrameStart"],imgui.color_convert_u32_to_float4(0XFF00FF00),out_clicked=True,held=True)
-        if ret[2] and not ret[4]:
-            static.config["FrameStart"] = np.floor(ret[1])
-            pass
-
+        ret = implot.drag_line_x(0,static.frameID,imgui.color_convert_u32_to_float4(0XFFFFFFFF),thickness=3,flags=implot.DragToolFlags_.delayed,held=True)
+        
+        if ret[0] and ret[4]:
+            if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
+                static.frameID = min(max(np.floor(ret[1]),0), static.config['FrameCount'] - 1)
+                global videoFile
+                LoadFrame(static.frameID,videoFile)
+                
+        ret = implot.drag_line_x(2,static.config["FrameStart"],imgui.color_convert_u32_to_float4(0XFF00FF00),flags=implot.DragToolFlags_.delayed,held=True)
+        
+        if ret[0] and ret[4]:
+            if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
+                static.config["FrameStart"] = max(min(np.floor(ret[1]), static.config["FrameEnd"] - 1), 0)
+            
+            
+        ret = implot.drag_line_x(1,static.config["FrameEnd"],imgui.color_convert_u32_to_float4(0XFF0000FF),flags=implot.DragToolFlags_.delayed,held=True)
+        
+        if ret[0] and ret[4]:
+            if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
+                static.config["FrameEnd"] = min(max(np.floor(ret[1]), static.config["FrameStart"] + 1), static.config['FrameCount'])
+                
         lb = implot.plot_to_pixels(limit.x.min,limit.y.min)
         ru = implot.plot_to_pixels(limit.x.max,limit.y.max)
         draw_list.push_clip_rect(imgui.ImVec2(lb.x,ru.y),imgui.ImVec2(ru.x,lb.y))
 
-        mousepos = implot.get_plot_mouse_pos()
-        mousex = min(static.config['FrameCount'], np.round(mousepos.x))
+        #mousepos = implot.get_plot_mouse_pos()
+        #mousex = min(static.config['FrameCount'], np.round(mousepos.x))
         rangeBoxLU = implot.plot_to_pixels(static.config["FrameStart"], limit.y.max)
         rangeBoxRD = implot.plot_to_pixels(static.config["FrameEnd"], limit.y.min)
 
         draw_list.add_rect_filled(rangeBoxLU, rangeBoxRD, 0X11FFFFFF)
-        if False:#implot.is_plot_hovered():
-
-            top  = implot.plot_to_pixels(mousex - halfWidth, limit.y.max)
-            bot = implot.plot_to_pixels(mousex + halfWidth, limit.y.min)
-            
-            draw_list.add_rect_filled(top, bot, 0X66FFFFFF)
-            if imgui.is_mouse_released(imgui.MouseButton_.left) and imgui.get_mouse_drag_delta(imgui.MouseButton_.left).x == 0:
-                global videoFile
-                if not hasattr(static, 'loadVideoThread') or not static.loadVideoThread.is_alive():
-                    LoadFrame(mousex,videoFile)
-
-        draw_list.add_line(implot.plot_to_pixels(static.frameID, limit.y.max), implot.plot_to_pixels(static.frameID, limit.y.min), 0XFFFFFFFF)
-        draw_list.add_line([rangeBoxLU.x,rangeBoxLU.y],[rangeBoxLU.x,rangeBoxRD.y], 0XFF00FF00)
-        draw_list.add_line([rangeBoxRD.x,rangeBoxLU.y],[rangeBoxRD.x,rangeBoxRD.y], 0XFF0000FF)
         
         
         draw_list.pop_clip_rect()
         implot.end_plot()
+    imgui.pop_id()
+        
 
 
 def PlotSkill(data : list['SkillUse'], halfWidth = 10):
@@ -373,7 +377,7 @@ def BoxSizePanel(panelWidth, panelHeight):
 
 def AnalyzationControlPanel(panelWidth, panelHeight):
 
-    imgui.begin_child("##VideoControlPanel",[panelWidth,panelHeight],window_flags= imgui.WindowFlags_.no_scrollbar)
+    imgui.begin_child("##VideoControlPanel",[panelWidth,panelHeight],window_flags= imgui.WindowFlags_.no_scrollbar | imgui.WindowFlags_.no_decoration )
     imgui.separator_text("動画識別コントロールパネル")
 
             
@@ -437,7 +441,7 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
     
     imgui.begin_group()
 
-    BoxSizePanel(panelWidth/2, panelHeight/2)
+    BoxSizePanel(panelWidth/4, panelHeight)
     imgui.same_line()
     diffColor = [np.uint8(static.config['DiffColorb']),np.uint8(static.config['DiffColorg']), np.uint8(static.config['DiffColorr'])]
 
@@ -455,12 +459,12 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
         static.costVis2min = cv2.resize(((np.asarray([colsum])> 12)*255).astype(np.uint8),(400,20))
 
         static.dataFrameID = static.frameID
-        static.currentCost = str( ocr_utils.CalculateCost(static.costImg,int(static.config["Threshold"]), static.config['TotalCost'], diffColor,5))
+        static.currentCost = str( ocr_utils.CalculateCost(static.costImg,int(static.config["Threshold"]), static.config['TotalCost'], diffColor,12))
         static.TimeImg = np.copy(static.rawFrameImg[static.config['TimeBoxy'] : static.config['TimeBoxy'] + static.config['TimeBoxh'], static.config['TimeBoxx']: static.config['TimeBoxx'] + static.config['TimeBoxw'],  :])
         static.SkillImg = np.copy(static.rawFrameImg[static.config['SkillBoxy'] : static.config['SkillBoxy'] + static.config['SkillBoxh'], static.config['SkillBoxx']: static.config['SkillBoxx'] + static.config['SkillBoxw'],  :])
     
     imgui.begin_group()
-    displayh = int(np.round(panelHeight/8))
+    displayh = int(np.round(panelHeight/9))
     
     panelw = int(panelWidth/2 -40)
     Imgwhr = static.TimeImg.shape[1]/static.TimeImg.shape[0]
@@ -478,9 +482,9 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
         
     immvision.image_display("スキル##SkillImg", static.SkillImg, (int(np.round(displayw)),displayh), refresh_image = True)
     
-    imgui.end_group()
 
     imgui.text("コスト")
+    imgui.same_line()
     imgui.color_button("識別色",[diffColor[2]/255,diffColor[1]/255,diffColor[0]/255,1])
     imgui.same_line()
     changed, static.config["Threshold"] = imgui.slider_int("##thresholdSlider", int(static.config["Threshold"]),0,255,flags=imgui.SliderFlags_.always_clamp)
@@ -488,9 +492,9 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
     if changed:
         static.dataFrameID = -1
 
-    displayh = int(np.round(panelHeight/4))
+    displayh = int(np.round(panelHeight/5))
 
-    panelw = int(panelWidth - 20)
+    panelw = int(panelWidth * 3 / 4 - 40)
     Imgwhr = static.costImg.shape[1]/static.costImg.shape[0]
     displayw = Imgwhr*displayh
     if displayw > panelw:
@@ -532,12 +536,14 @@ def BoxVisualizationPanel(panelWidth, panelHeight):
     
     imgui.text("Cost :" + static.currentCost)
     
+    imgui.end_group()
 
     imgui.end_group()
 
 def DrawGraph():
 
-    if implot.begin_plot("##cost plot",size=[-1,-1]):
+    imgui.begin_group()
+    if implot.begin_plot("##cost plot",[-1,-1],implot.Flags_.no_frame):
         
         implot.setup_axes("frame", "cost", implot.AxisFlags_.range_fit,implot.AxisFlags_.lock)
 
@@ -550,10 +556,10 @@ def DrawGraph():
         implot.setup_axis_limits_constraints(implot.ImAxis_.y1, 0, static.config['TotalCost'])
         PlotSkill( static.Cost_Frame)
         implot.end_plot()
+    imgui.end_group()
         
 def DrawTable():
-
-    imgui.progress_bar(static.frameID/ static.config['FrameCount'],overlay="フレーム:" + str(int(static.frameID)))
+    imgui.begin_group()
     tableFlags =  imgui.TableFlags_.row_bg | imgui.TableFlags_.borders | imgui.TableFlags_.highlight_hovered_column | imgui.TableFlags_.scroll_y | imgui.TableFlags_.sizing_fixed_fit
     if imgui.begin_table("##cost table",columns = 10,flags=tableFlags):
         imgui.table_setup_scroll_freeze(0,1)
@@ -636,6 +642,7 @@ def DrawTable():
             
                 
         imgui.end_table()
+    imgui.end_group()
 
 def Init():
     global videoFile
@@ -682,7 +689,7 @@ def gui():
     videoHeight = int(videoViewWidth / 16 * 9)
     sideBuffer = (windowWidth-videoViewWidth)/2
     
-    AnalyzationControlPanel(sideBuffer - 20, videoHeight/2)
+    AnalyzationControlPanel(sideBuffer - 20, videoHeight - 30)
     
     imgui.same_line()
     
@@ -690,7 +697,7 @@ def gui():
 
     imgui.same_line()
     
-    imgui.begin_child("##RightPanel",[sideBuffer - 20,videoHeight],window_flags= imgui.WindowFlags_.no_scrollbar)
+    imgui.begin_child("##RightPanel",[sideBuffer - 20,videoHeight - 30],window_flags= imgui.WindowFlags_.no_scrollbar)
     
     imgui.separator_text("ジェネラル")
     
@@ -704,9 +711,9 @@ def gui():
             
 
     imgui.end_child()
-    PlotSeekbar((windowWidth,500))
-    height = windowHeight - videoHeight - 20
-    imgui.begin_child("##DataWindow",(-1,-1),window_flags=imgui.WindowFlags_.no_scroll_with_mouse| imgui.WindowFlags_.no_scrollbar)
+    PlotSeekbar((windowWidth,80))
+    height = windowHeight - videoHeight - 20 - 100
+    
     imgui.begin_vertical("##DataWindowSelector",(50,height))
     
     if imgui.button("テ\nー\nブ\nル",size=(50,((static.BottomWindowSwitch == 1) + 1) *height/4)):
@@ -724,7 +731,6 @@ def gui():
     imgui.end_vertical()
     
     imgui.same_line()
-    imgui.begin_child("##DataDisplayWindow",size=[-1,-1])
     
     if static.BottomWindowSwitch == 0:
         DrawGraph()
@@ -732,9 +738,8 @@ def gui():
         DrawTable()
     else:
         BoxVisualizationPanel(windowWidth - 50,height)
-    imgui.end_child()
-    
-    imgui.end_child()
+        
+        
     if static.Dirty:
         with open(download_window.selectedProject + "\\setting.json", "w",encoding="utf-8") as file:
             json.dump(static.config,file, ensure_ascii=False, indent=4)
