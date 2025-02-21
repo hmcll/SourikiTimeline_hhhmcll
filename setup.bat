@@ -1,4 +1,4 @@
-##powershell Expand-Archive -Force ./Python.zip ./Python
+powershell Expand-Archive -Force ./Python.zip ./Python
 cd ./Python
 powershell Expand-Archive -Force ./python-3.12.9-embed-amd64.zip ./Runtime
 copy "requirements.txt" "./Runtime/"
