@@ -732,7 +732,7 @@ def gui():
     if imgui.button("グ\nラ\nフ",size=(50,((static.BottomWindowSwitch == 0) + 1) *height/4)):
         static.BottomWindowSwitch = 0
 
-    if imgui.button("コ\nス\nト",size=(50,((static.BottomWindowSwitch == 2) + 1) * height/4)):
+    if imgui.button("ボ\nッ\nク\nス",size=(50,((static.BottomWindowSwitch == 2) + 1) * height/4)):
         static.BottomWindowSwitch = 2
         
         
