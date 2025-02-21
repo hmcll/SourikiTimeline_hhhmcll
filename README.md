@@ -1,7 +1,8 @@
 # 総力戦タイムラインメーカー@hhhmcll
 
 @kidonaruさんの総力戦タイムラインメーカーをリメークしたものです。
-![オリジナル@kidonaru](https://github.com/kidonaru/SourikiTimeline)
+
+[オリジナル @kidonaru](https://github.com/kidonaru/SourikiTimeline)
 
 ## 概要
 
@@ -9,19 +10,19 @@
 
 ### メイン機能
 
-Youtube総力戦動画ダウンロード
+- Youtube総力戦動画ダウンロード
 
-自動タイムライン生成
+- 自動タイムライン生成
 
-手動タイムライン調整
+- 手動タイムライン調整
 
-動画フレーム分析
+- 動画フレーム分析
 
 ## インストール方法
 
 ### Windows
 
-1. リポジトリをZipでダウンロードします
+1. [リリース](https://github.com/hmcll/SourikiTimeline_hhhmcll/releases/tag/Beta)をZipでダウンロードします
 2. `setup.bat`を実行します。
    
 ### 他プラットフォーム
