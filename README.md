@@ -41,7 +41,7 @@ setup.batを読んで、自力でインストールしてください。
 ## 使い方
 
 1. **プロジェクト選択画面**
-   ！[ダウンロード画面](https://github.com/hmcll/SourikiTimeline_hhhmcll/blob/main/ReadmeResources/Box.png)
+   ！[ダウンロード画面](https://github.com/hmcll/SourikiTimeline_hhhmcll/blob/main/ReadmeResources/Box.png?raw=true)
    - 黄色い枠の部分はダウンロード済のプロジェクトです
    - 新しいプロジェクトを作りたいときは赤い枠にリンクをペーストし、ダウンロードボタンを押します
    - 決まったら、プロジェクトを選択し、このプロジェクトで進むボタンを押します。
