@@ -41,12 +41,24 @@ setup.batを読んで、自力でインストールしてください。
 ## 使い方
 
 1. **プロジェクト選択画面**
-   ！[ダウンロード画面](https://github.com/hmcll/SourikiTimeline_hhhmcll/blob/main/ReadmeResources/Box.png?raw=true)
+   
+   ![ダウンロード画面](https://github.com/hmcll/SourikiTimeline_hhhmcll/blob/main/ReadmeResources/Download.png?raw=true)
    - 黄色い枠の部分はダウンロード済のプロジェクトです
    - 新しいプロジェクトを作りたいときは赤い枠にリンクをペーストし、ダウンロードボタンを押します
    - 決まったら、プロジェクトを選択し、このプロジェクトで進むボタンを押します。
 
 2. **分析画面**
+
+- #### ボックス表示
+   ![ボックス](https://github.com/hmcll/SourikiTimeline_hhhmcll/blob/main/ReadmeResources/Box.png?raw=true)
+
+- #### グラフ表示
+
+   ![グラフ](https://github.com/hmcll/SourikiTimeline_hhhmcll/blob/main/ReadmeResources/Graph.png?raw=true)
+
+- #### テーブル表示
+
+   ![テーブル](https://github.com/hmcll/SourikiTimeline_hhhmcll/blob/main/ReadmeResources/Table.png?raw=true)
 
 3. **分析データ範囲調整**
    - 画面左上の動画識別コントロールパネルの`10コスト`・`20コスト`ボタンを押すと、10コスト、20コストモードを切り替えます。
