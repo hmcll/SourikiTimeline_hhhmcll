@@ -60,7 +60,7 @@ class CharaSkill:
         return chara_skills
     
     @classmethod
-    def find_best_match(cls, chara_skills: dict, query_skill: str, threshold: int = 50):
+    def find_best_match(cls, chara_skills: dict, query_skill: str, threshold: int = 20):
         if query_skill == '':
             return None, 0
 
